@@ -52,7 +52,7 @@ export default function LoginPage() {
         {/* Main Content */}
         <div>
           <h2 className="text-5xl font-bold mb-6 leading-tight">
-            Scalio Pharma
+            ScalioPharma
           </h2>
           <p className="text-xl text-red-100 mb-12 max-w-md leading-relaxed">
             Modern Pharmacy Management Software - Streamline your operations with our comprehensive platform.
@@ -109,7 +109,7 @@ export default function LoginPage() {
                 <span className="text-red-600">Lab</span>
               </h1>
             </a>
-            <p className="text-gray-600">Scalio Pharma</p>
+            <p className="text-gray-600">ScalioPharma</p>
           </div>
 
           {/* Form Card */}
@@ -208,9 +208,14 @@ export default function LoginPage() {
 
             <p className="text-center text-sm text-gray-600 mt-8">
               New pharmacy?{' '}
-              <Link to="/register" className="font-medium text-red-600 hover:text-red-700 transition">
-                Register here
-              </Link>
+              <a
+                href="https://scaliolab.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-red-600 hover:text-red-700 transition"
+              >
+                Contact ScalioLab
+              </a>
             </p>
           </div>
 

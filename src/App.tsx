@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useTenantBranding } from '@/hooks/useTenantBranding'
 import MainLayout from '@/components/layout/MainLayout'
+import HomePage from '@/pages/HomePage'
 import LoginPage from '@/pages/auth/LoginPage'
 import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
 import SuperAdminLoginPage from '@/pages/admin/SuperAdminLoginPage'
@@ -43,6 +44,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public routes */}
+        <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
@@ -53,14 +55,12 @@ export default function App() {
 
         {/* Protected routes inside layout */}
         <Route
-          path="/"
           element={
             <ProtectedRoute>
               <MainLayout />
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard"    element={<DashboardPage />} />
           <Route path="medicines"    element={<MedicinesPage />} />
           <Route path="medicines/new"         element={<MedicineFormPage />} />
