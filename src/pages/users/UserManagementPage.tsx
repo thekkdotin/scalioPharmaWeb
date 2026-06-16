@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { usePermissions } from '@/hooks/usePermissions'
 import { Navigate } from 'react-router-dom'
 import { UserPlus, Edit2, Trash2, ToggleLeft, ToggleRight, Key } from 'lucide-react'
+import { apiClient } from '@/api/client'
 
 interface User {
   id: string
@@ -36,14 +37,11 @@ export default function UserManagementPage() {
   if (!perms.canManageUsers) return <Navigate to="/dashboard" replace />
 
   // Auth is via HttpOnly cookie — send it with credentials: 'include'.
-  const headers = { 'Content-Type': 'application/json' }
-
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/v1/users', { headers, credentials: 'include' })
-      const json = await res.json()
-      setUsers(json.data || [])
+      const res = await apiClient.get('/api/v1/users')
+      setUsers(res.data.data || [])
     } finally {
       setLoading(false)
     }
@@ -56,8 +54,7 @@ export default function UserManagementPage() {
     setError('')
     setSaving(true)
     try {
-      const res = await fetch('/api/v1/users', { method: 'POST', headers, credentials: 'include', body: JSON.stringify(form) })
-      const json = await res.json()
+      const { data: json } = await apiClient.post('/api/v1/users', form)
       if (!json.success) { setError(json.message || 'Failed to create user'); return }
       setShowModal(false)
       setForm({ name: '', email: '', password: '', role: 'STAFF', phone: '' })
@@ -70,15 +67,13 @@ export default function UserManagementPage() {
   }
 
   const toggleActive = async (user: User) => {
-    await fetch(`/api/v1/users/${user.id}/toggle-active`, {
-      method: 'PATCH', headers, credentials: 'include', body: JSON.stringify({ active: !user.active })
-    })
+    await apiClient.patch(`/api/v1/users/${user.id}/toggle-active`, { active: !user.active })
     fetchUsers()
   }
 
   const deleteUser = async (user: User) => {
     if (!confirm(`Delete user "${user.name}"? This cannot be undone.`)) return
-    await fetch(`/api/v1/users/${user.id}`, { method: 'DELETE', headers, credentials: 'include' })
+    await apiClient.delete(`/api/v1/users/${user.id}`)
     fetchUsers()
   }
 
@@ -88,10 +83,9 @@ export default function UserManagementPage() {
     setError('')
     setSaving(true)
     try {
-      const res = await fetch(`/api/v1/users/${showResetModal.id}/reset-password`, {
-        method: 'PUT', headers, credentials: 'include', body: JSON.stringify({ newPassword: resetPassword })
+      const { data: json } = await apiClient.put(`/api/v1/users/${showResetModal.id}/reset-password`, {
+        newPassword: resetPassword,
       })
-      const json = await res.json()
       if (!json.success) { setError(json.message || 'Failed'); return }
       setShowResetModal(null)
       setResetPassword('')
