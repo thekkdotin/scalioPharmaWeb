@@ -25,6 +25,7 @@ export const medicinesApi = {
 
   addBatch: (tenantId: string, medicineId: string, data: {
     batchNumber?: string; quantity: number; purchasePrice: number;
+    totalPurchasedQuantity?: number; totalSoldQuantity?: number; remainingQuantity?: number;
     sellingPrice: number; expiryDate: string; manufactureDate?: string;
     mrp?: number; tabletsPerStrip?: number; rackLocationId?: string;
   }) =>

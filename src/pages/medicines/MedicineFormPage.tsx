@@ -23,8 +23,12 @@ const BLANK: Partial<Medicine> = {
 }
 
 interface OpeningStock {
+  entryMode: 'current' | 'setup'
   batchNumber: string
   quantity: number
+  totalPurchasedQuantity: number
+  totalSoldQuantity: number
+  remainingQuantity: number
   purchasePrice: number
   sellingPrice: number
   mrp: number
@@ -35,7 +39,8 @@ interface OpeningStock {
 }
 
 const BLANK_STOCK: OpeningStock = {
-  batchNumber: '', quantity: 1, purchasePrice: 0, sellingPrice: 0, mrp: 0, tabletsPerStrip: 1, expiryDate: '', manufactureDate: '', rackLocationId: '',
+  entryMode: 'current', batchNumber: '', quantity: 1, totalPurchasedQuantity: 1, totalSoldQuantity: 0, remainingQuantity: 1,
+  purchasePrice: 0, sellingPrice: 0, mrp: 0, tabletsPerStrip: 1, expiryDate: '', manufactureDate: '', rackLocationId: '',
 }
 
 export default function MedicineFormPage() {
@@ -82,6 +87,9 @@ export default function MedicineFormPage() {
     setStock({
       ...BLANK_STOCK,
       quantity: 1,
+      totalPurchasedQuantity: 1,
+      totalSoldQuantity: 0,
+      remainingQuantity: 1,
       purchasePrice: batch ? Number((batch.purchasePrice * tps).toFixed(2)) : 0,
       sellingPrice: batch ? Number((batch.sellingPrice * tps).toFixed(2)) : 0,
       mrp: batch?.mrp ? Number((batch.mrp * tps).toFixed(2)) : 0,
@@ -112,20 +120,29 @@ export default function MedicineFormPage() {
     setAddStock(false)
   }
 
+  const stockPayload = () => {
+    const isSetup = (settings?.firstTimeSetupEnabled ?? true) && stock.entryMode === 'setup'
+    const remaining = Math.max(0, stock.remainingQuantity)
+    return {
+      batchNumber: stock.batchNumber || undefined,
+      quantity: isSetup ? Math.max(1, remaining) : stock.quantity,
+      totalPurchasedQuantity: isSetup ? Math.max(1, stock.totalPurchasedQuantity) : undefined,
+      totalSoldQuantity: isSetup ? Math.max(0, stock.totalSoldQuantity) : undefined,
+      remainingQuantity: isSetup ? remaining : undefined,
+      purchasePrice: stock.purchasePrice,
+      sellingPrice: stock.sellingPrice,
+      mrp: stock.mrp > 0 ? stock.mrp : undefined,
+      tabletsPerStrip: stock.tabletsPerStrip > 1 ? stock.tabletsPerStrip : undefined,
+      expiryDate: stock.expiryDate,
+      manufactureDate: stock.manufactureDate || undefined,
+      rackLocationId: stock.rackLocationId || undefined,
+    }
+  }
+
   const mutation = useMutation({
     mutationFn: async () => {
       if (!isEdit && selectedExisting) {
-        await medicinesApi.addBatch(tenantId, selectedExisting.id, {
-          batchNumber: stock.batchNumber || undefined,
-          quantity: stock.quantity,
-          purchasePrice: stock.purchasePrice,
-          sellingPrice: stock.sellingPrice,
-          mrp: stock.mrp > 0 ? stock.mrp : undefined,
-          tabletsPerStrip: stock.tabletsPerStrip > 1 ? stock.tabletsPerStrip : undefined,
-          expiryDate: stock.expiryDate,
-          manufactureDate: stock.manufactureDate || undefined,
-          rackLocationId: stock.rackLocationId || undefined,
-        })
+        await medicinesApi.addBatch(tenantId, selectedExisting.id, stockPayload())
         return selectedExisting
       }
 
@@ -135,17 +152,7 @@ export default function MedicineFormPage() {
         if (existing) {
           // Medicine exists — just add stock batch if requested, otherwise warn
           if (addStock && stock.expiryDate && stock.quantity > 0) {
-            await medicinesApi.addBatch(tenantId, existing.id, {
-              batchNumber: stock.batchNumber || undefined,
-              quantity: stock.quantity,
-              purchasePrice: stock.purchasePrice,
-              sellingPrice: stock.sellingPrice,
-              mrp: stock.mrp > 0 ? stock.mrp : undefined,
-              tabletsPerStrip: stock.tabletsPerStrip > 1 ? stock.tabletsPerStrip : undefined,
-              expiryDate: stock.expiryDate,
-              manufactureDate: stock.manufactureDate || undefined,
-              rackLocationId: stock.rackLocationId || undefined,
-            })
+            await medicinesApi.addBatch(tenantId, existing.id, stockPayload())
             return existing
           } else {
             throw new Error(`"${form.name}" already exists. Enable "Add Opening Stock" to add stock to the existing record.`)
@@ -160,17 +167,7 @@ export default function MedicineFormPage() {
 
       // Add opening stock for new medicine
       if (!isEdit && addStock && stock.expiryDate && stock.quantity > 0) {
-        await medicinesApi.addBatch(tenantId, medicine.id, {
-          batchNumber: stock.batchNumber || undefined,
-          quantity: stock.quantity,
-          purchasePrice: stock.purchasePrice,
-          sellingPrice: stock.sellingPrice,
-          mrp: stock.mrp > 0 ? stock.mrp : undefined,
-          tabletsPerStrip: stock.tabletsPerStrip > 1 ? stock.tabletsPerStrip : undefined,
-          expiryDate: stock.expiryDate,
-          manufactureDate: stock.manufactureDate || undefined,
-          rackLocationId: stock.rackLocationId || undefined,
-        })
+        await medicinesApi.addBatch(tenantId, medicine.id, stockPayload())
       }
       return medicine
     },
@@ -190,6 +187,7 @@ export default function MedicineFormPage() {
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); mutation.mutate() }
   const isUsingExisting = !isEdit && !!selectedExisting
+  const firstTimeSetupEnabled = settings?.firstTimeSetupEnabled ?? true
 
   if (isEdit && isLoading) return <PageLoader />
 
@@ -324,14 +322,75 @@ export default function MedicineFormPage() {
               </p>
             )}
             {(addStock || isUsingExisting) && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    ['current', 'Current stock only'],
+                    ...(firstTimeSetupEnabled ? [['setup', 'First-time totals'] as const] : []),
+                  ] as const).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setStock(s => ({ ...s, entryMode: mode }))}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition ${
+                        stock.entryMode === mode
+                          ? 'bg-pharma-600 text-white border-pharma-600'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-pharma-300'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {firstTimeSetupEnabled && stock.entryMode === 'setup' && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-lg border border-amber-100 bg-amber-50 p-3">
+                    <Field label="Total Stock Entered *">
+                      <input type="number" min={1} value={stock.totalPurchasedQuantity}
+                        onChange={e => {
+                          const total = Math.max(1, Number(e.target.value))
+                          setStock(s => ({
+                            ...s,
+                            totalPurchasedQuantity: total,
+                            totalSoldQuantity: Math.min(s.totalSoldQuantity, total),
+                            remainingQuantity: Math.max(0, total - Math.min(s.totalSoldQuantity, total)),
+                            quantity: Math.max(1, total),
+                          }))
+                        }}
+                        className={inputClass} />
+                    </Field>
+                    <Field label="Old Sold Qty *">
+                      <input type="number" min={0} max={stock.totalPurchasedQuantity} value={stock.totalSoldQuantity}
+                        onChange={e => {
+                          const sold = Math.min(Math.max(0, Number(e.target.value)), stock.totalPurchasedQuantity)
+                          setStock(s => ({
+                            ...s,
+                            totalSoldQuantity: sold,
+                            remainingQuantity: Math.max(0, s.totalPurchasedQuantity - sold),
+                          }))
+                        }}
+                        className={inputClass} />
+                    </Field>
+                    <Field label="Current Remaining *">
+                      <input type="number" min={0} max={stock.totalPurchasedQuantity} value={stock.remainingQuantity}
+                        onChange={e => setStock(s => ({...s, remainingQuantity: Math.min(Math.max(0, Number(e.target.value)), s.totalPurchasedQuantity)}))}
+                        className={inputClass} />
+                    </Field>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Field label="Batch Number">
                   <input value={stock.batchNumber} onChange={e => setStock(s => ({...s, batchNumber: e.target.value}))}
                     className={inputClass} placeholder="Auto-generated if empty" />
                 </Field>
-                <Field label="Quantity *">
+                <Field label={stock.entryMode === 'setup' ? 'Current Batch Qty' : 'Quantity *'}>
                   <input type="number" min={1} required={addStock} value={stock.quantity}
-                    onChange={e => setStock(s => ({...s, quantity: Number(e.target.value)}))}
+                    disabled={stock.entryMode === 'setup'}
+                    onChange={e => {
+                      const qty = Math.max(1, Number(e.target.value))
+                      setStock(s => ({...s, quantity: qty, totalPurchasedQuantity: qty, remainingQuantity: qty}))
+                    }}
                     className={inputClass} />
                 </Field>
                 <Field label="Storage Rack">
@@ -380,6 +439,7 @@ export default function MedicineFormPage() {
                     onChange={e => setStock(s => ({...s, manufactureDate: e.target.value}))}
                     className={inputClass} />
                 </Field>
+                </div>
               </div>
             )}
           </div>

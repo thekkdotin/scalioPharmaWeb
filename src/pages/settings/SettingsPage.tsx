@@ -291,6 +291,31 @@ export default function SettingsPage() {
                     : 'Display mode: "10.2 strips" (strip count only)'}
                 </div>
               </div>
+
+              <div className="border-t border-gray-100 pt-4 mt-4">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="firstTimeSetupEnabled"
+                    checked={form.firstTimeSetupEnabled ?? true}
+                    onChange={(e) => set('firstTimeSetupEnabled', e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-pharma-600"
+                  />
+                  <div>
+                    <label htmlFor="firstTimeSetupEnabled" className="text-sm font-medium text-gray-700 cursor-pointer">
+                      Show first-time setup tools
+                    </label>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Controls opening stock totals and old daily sales entry. Turn this off after onboarding is complete.
+                    </p>
+                  </div>
+                </div>
+                <div className={`text-xs px-3 py-2 rounded-lg mt-2 ${(form.firstTimeSetupEnabled ?? true) ? 'bg-amber-50 text-amber-700' : 'bg-gray-50 text-gray-700'}`}>
+                  {(form.firstTimeSetupEnabled ?? true)
+                    ? 'Setup tools visible'
+                    : 'Setup tools hidden'}
+                </div>
+              </div>
             </div>
           </div>
         )}

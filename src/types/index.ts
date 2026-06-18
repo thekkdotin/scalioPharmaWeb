@@ -324,6 +324,20 @@ export interface DailyRow {
   cardAmount: number
 }
 
+export interface HistoricalDailySale {
+  id?: string
+  tenantId?: string
+  saleDate: string
+  salesCount: number
+  revenue: number
+  cost: number
+  profit: number
+  cashAmount: number
+  upiAmount: number
+  cardAmount: number
+  notes?: string
+}
+
 export interface SaleReturnItem {
   medicineId: string
   medicineName: string
@@ -454,4 +468,6 @@ export interface TenantSettings {
   allowLooseSale: boolean
   /** When true: show stock as "X strips, Y tabs". When false: show total tablet count. */
   showStripsAndTabs: boolean
+  /** Shows first-time onboarding tools for opening stock totals and old daily sales. */
+  firstTimeSetupEnabled: boolean
 }
