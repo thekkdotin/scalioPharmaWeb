@@ -21,7 +21,7 @@ export default function SuperAdminLoginPage() {
     setLoading(true)
     try {
       const data = await authApi.superAdminLogin(form.email, form.password)
-      setAuth(data.user)
+      setAuth(data.user, data.accessToken)
       toast.success('Signed in to System Console')
       navigate('/admin')
     } catch (err: any) {

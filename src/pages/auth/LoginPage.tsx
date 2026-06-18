@@ -22,7 +22,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const data = await authApi.login(form.email, form.password, form.subdomain)
-      setAuth(data.user)
+      setAuth(data.user, data.accessToken)
       toast.success(`Welcome back, ${data.user.name}!`)
       navigate('/dashboard')
     } catch (err: any) {

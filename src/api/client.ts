@@ -8,8 +8,16 @@ export const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 30_000,
   headers: { 'Content-Type': 'application/json' },
-  // Auth tokens live in HttpOnly cookies; send them with every request.
+  // Prefer HttpOnly cookies; also allow a Bearer fallback for cross-site cookie blocking.
   withCredentials: true,
+})
+
+apiClient.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().accessToken
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 // On 401, attempt a one-shot cookie refresh and retry; otherwise log out.
