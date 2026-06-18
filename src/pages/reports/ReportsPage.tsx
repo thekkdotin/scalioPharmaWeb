@@ -56,7 +56,7 @@ export default function ReportsPage() {
   const [trendFrom, setTrendFrom] = useState(defaultFrom)
   const [trendTo, setTrendTo] = useState(today)
   const [historyForm, setHistoryForm] = useState<Partial<HistoricalDailySale>>({
-    saleDate: today, salesCount: 0, revenue: 0, cost: 0, profit: 0, cashAmount: 0, upiAmount: 0, cardAmount: 0, notes: '',
+    saleDate: today, revenue: 0, profit: 0,
   })
 
   const { data: daily, isLoading: dl } = useQuery({
@@ -96,10 +96,15 @@ export default function ReportsPage() {
     staleTime: 60_000,
   })
 
+  const historicalOnboardingOpen =
+    (settings?.firstTimeSetupEnabled ?? true) &&
+    !(settings?.inventoryOnboardingCompleted ?? false) &&
+    (settings?.inventoryOnboardingMode ?? 'CURRENT_STOCK') === 'FULL_HISTORY'
+
   const { data: historicalRows = [] } = useQuery({
     queryKey: ['historical-daily-sales', tenantId, trendFrom, trendTo],
     queryFn: () => reportsApi.historicalDailySales(tenantId, trendFrom, trendTo),
-    enabled: tab === 'trend' && (settings?.firstTimeSetupEnabled ?? true),
+    enabled: tab === 'trend' && historicalOnboardingOpen,
   })
 
   const { data: dues, isLoading: dul } = useQuery({
@@ -155,9 +160,17 @@ export default function ReportsPage() {
 
   const setHistoryNumber = (key: keyof HistoricalDailySale, value: string) => {
     const amount = Number(value)
-    setHistoryForm(f => ({ ...f, [key]: Number.isFinite(amount) ? amount : 0 }))
+    const nextAmount = Number.isFinite(amount) ? amount : 0
+    setHistoryForm(f => {
+      const next = { ...f, [key]: nextAmount }
+      if (key === 'revenue' || key === 'profit') {
+        next.salesValue = Number(next.revenue ?? 0)
+        next.cost = Number(next.revenue ?? 0) - Number(next.profit ?? 0)
+        next.purchaseValue = next.cost
+      }
+      return next
+    })
   }
-  const firstTimeSetupEnabled = settings?.firstTimeSetupEnabled ?? true
 
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -322,45 +335,27 @@ export default function ReportsPage() {
               className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pharma-500" />
           </div>
 
-          {firstTimeSetupEnabled && (
+          {historicalOnboardingOpen && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-semibold text-gray-700">Old Daily Sales Entry</h3>
-                <p className="text-xs text-gray-400">Use this during first-time setup to bring older revenue and profit into trends.</p>
+                <p className="text-xs text-gray-400">Enter date, total old sales revenue, and profit or loss for that day.</p>
               </div>
               <Button size="sm" onClick={() => saveHistory.mutate()} disabled={saveHistory.isPending || !historyForm.saleDate}>
                 {saveHistory.isPending ? 'Saving...' : 'Save Row'}
               </Button>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <input type="date" value={historyForm.saleDate || today} max={today}
                 onChange={(e) => setHistoryForm(f => ({ ...f, saleDate: e.target.value }))}
                 className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pharma-500" />
-              <input type="number" min={0} value={historyForm.salesCount ?? 0} placeholder="Bills"
-                onChange={(e) => setHistoryNumber('salesCount', e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pharma-500" />
-              <input type="number" min={0} step="0.01" value={historyForm.revenue ?? 0} placeholder="Revenue"
+              <input type="number" min={0} step="0.01" value={historyForm.revenue ?? 0} placeholder="Old sales value"
                 onChange={(e) => setHistoryNumber('revenue', e.target.value)}
                 className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pharma-500" />
-              <input type="number" min={0} step="0.01" value={historyForm.cost ?? 0} placeholder="Cost"
-                onChange={(e) => setHistoryNumber('cost', e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pharma-500" />
-              <input type="number" step="0.01" value={historyForm.profit ?? 0} placeholder="Profit"
+              <input type="number" step="0.01" value={historyForm.profit ?? 0} placeholder="Profit / loss"
                 onChange={(e) => setHistoryNumber('profit', e.target.value)}
                 className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pharma-500" />
-              <input type="number" min={0} step="0.01" value={historyForm.cashAmount ?? 0} placeholder="Cash"
-                onChange={(e) => setHistoryNumber('cashAmount', e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pharma-500" />
-              <input type="number" min={0} step="0.01" value={historyForm.upiAmount ?? 0} placeholder="UPI"
-                onChange={(e) => setHistoryNumber('upiAmount', e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pharma-500" />
-              <input type="number" min={0} step="0.01" value={historyForm.cardAmount ?? 0} placeholder="Card"
-                onChange={(e) => setHistoryNumber('cardAmount', e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pharma-500" />
-              <input value={historyForm.notes || ''} placeholder="Notes"
-                onChange={(e) => setHistoryForm(f => ({ ...f, notes: e.target.value }))}
-                className="col-span-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pharma-500" />
             </div>
             {historicalRows.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -371,7 +366,7 @@ export default function ReportsPage() {
                     onClick={() => setHistoryForm(row)}
                     className="text-xs rounded-lg border border-gray-200 px-2 py-1 text-gray-600 hover:border-pharma-300"
                   >
-                    {row.saleDate}: {formatCurrency(row.revenue)}
+                    {row.saleDate}: {formatCurrency(row.revenue)} / {formatCurrency(row.profit)}
                     <span
                       onClick={(e) => { e.stopPropagation(); deleteHistory.mutate(row.saleDate) }}
                       className="ml-2 text-red-500"

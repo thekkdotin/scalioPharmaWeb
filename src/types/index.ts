@@ -329,6 +329,8 @@ export interface HistoricalDailySale {
   tenantId?: string
   saleDate: string
   salesCount: number
+  salesValue?: number
+  purchaseValue?: number
   revenue: number
   cost: number
   profit: number
@@ -470,4 +472,8 @@ export interface TenantSettings {
   showStripsAndTabs: boolean
   /** Shows first-time onboarding tools for opening stock totals and old daily sales. */
   firstTimeSetupEnabled: boolean
+  /** CURRENT_STOCK = go-live stock only; FULL_HISTORY = purchased/sold/remaining setup. */
+  inventoryOnboardingMode: 'CURRENT_STOCK' | 'FULL_HISTORY'
+  /** Hides and blocks onboarding-only tools once setup is complete. */
+  inventoryOnboardingCompleted: boolean
 }

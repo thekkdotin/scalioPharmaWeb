@@ -10,7 +10,7 @@ import { PageLoader, LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { formatDate } from '@/lib/utils'
 import { Building2, CheckCircle2, CreditCard, AlertTriangle, LogOut, Plus, X, Settings2, KeyRound, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
-import type { Tenant, Subscription } from '@/types'
+import type { Tenant, Subscription, TenantSettings } from '@/types'
 
 const subVariant = (s?: string) =>
   s === 'ACTIVE' ? 'success' : s === 'GRACE' ? 'warning' : s === 'EXPIRED' ? 'danger' : 'default'
@@ -172,6 +172,10 @@ function ManageTenantDrawer({ tenant, subscription, onClose }:
     queryKey: ['admin-tenant-users', tenant.id],
     queryFn: () => adminApi.listTenantUsers(tenant.id),
   })
+  const { data: settings } = useQuery({
+    queryKey: ['admin-tenant-settings', tenant.id],
+    queryFn: () => adminApi.getTenantSettings(tenant.id),
+  })
 
   const [flags, setFlags] = useState({
     purchaseModuleEnabled: tenant.purchaseModuleEnabled,
@@ -184,6 +188,7 @@ function ManageTenantDrawer({ tenant, subscription, onClose }:
     primaryColor: tenant.primaryColor ?? '#8a0f0f',
     fontFamily: tenant.fontFamily ?? 'Inter',
   })
+  const [onboarding, setOnboarding] = useState<Partial<TenantSettings>>({})
   const today = new Date().toISOString().split('T')[0]
   const nextYear = new Date(Date.now() + 365 * 864e5).toISOString().split('T')[0]
   const [sub, setSub] = useState({
@@ -209,6 +214,14 @@ function ManageTenantDrawer({ tenant, subscription, onClose }:
     mutationFn: () => adminApi.updateBranding(tenant.id, brand),
     onSuccess: () => { toast.success('Branding updated'); refresh() }, onError: onErr,
   })
+  const saveOnboarding = useMutation({
+    mutationFn: () => adminApi.updateTenantSettings(tenant.id, { ...settings, ...onboarding }),
+    onSuccess: () => {
+      toast.success('Onboarding settings saved')
+      qc.invalidateQueries({ queryKey: ['admin-tenant-settings', tenant.id] })
+    },
+    onError: onErr,
+  })
   const setTempPassword = useMutation({
     mutationFn: () => adminApi.setTenantUserTemporaryPassword(tenant.id, resetUserId!, temporaryPassword),
     onSuccess: () => {
@@ -231,6 +244,9 @@ function ManageTenantDrawer({ tenant, subscription, onClose }:
     </div>
   )
   const input = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-scalio-600'
+  const onboardingForm = { ...(settings ?? {}), ...onboarding } as Partial<TenantSettings>
+  const setOnboardingField = (key: keyof TenantSettings, value: any) =>
+    setOnboarding(current => ({ ...current, [key]: value }))
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
@@ -293,6 +309,83 @@ function ManageTenantDrawer({ tenant, subscription, onClose }:
               <input placeholder="Font (e.g. Inter)" value={brand.fontFamily}
                 onChange={(e) => setBrand(b => ({ ...b, fontFamily: e.target.value }))} className={input} />
               <Button size="sm" onClick={() => saveBrand.mutate()} disabled={saveBrand.isPending}>Save branding</Button>
+            </div>
+          </Section>
+
+          {/* Inventory onboarding */}
+          <Section title="Inventory onboarding">
+            <div className="space-y-3">
+              {([
+                {
+                  mode: 'CURRENT_STOCK',
+                  title: 'Current stock only',
+                  body: 'Tenant enters only stock available on go-live day.',
+                },
+                {
+                  mode: 'FULL_HISTORY',
+                  title: 'Full historical inventory',
+                  body: 'Tenant can enter purchased-to-date, old sold quantity, current stock, and old sales summaries.',
+                },
+              ] as const).map(option => (
+                <label
+                  key={option.mode}
+                  className={`block rounded-lg border p-3 transition ${
+                    (onboardingForm.inventoryOnboardingMode ?? 'CURRENT_STOCK') === option.mode
+                      ? 'border-scalio-600 bg-scalio-50'
+                      : 'border-gray-100 bg-white'
+                  } ${onboardingForm.inventoryOnboardingCompleted ? 'opacity-70' : 'cursor-pointer'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="radio"
+                      name={`inventoryOnboardingMode-${tenant.id}`}
+                      value={option.mode}
+                      checked={(onboardingForm.inventoryOnboardingMode ?? 'CURRENT_STOCK') === option.mode}
+                      disabled={onboardingForm.inventoryOnboardingCompleted ?? false}
+                      onChange={() => setOnboardingField('inventoryOnboardingMode', option.mode)}
+                      className="mt-1 h-4 w-4 text-scalio-700 focus:ring-scalio-600"
+                    />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{option.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{option.body}</p>
+                    </div>
+                  </div>
+                </label>
+              ))}
+
+              <label className="flex items-start gap-3 rounded-lg border border-amber-100 bg-amber-50 p-3">
+                <input
+                  type="checkbox"
+                  checked={onboardingForm.firstTimeSetupEnabled ?? true}
+                  disabled={onboardingForm.inventoryOnboardingCompleted ?? false}
+                  onChange={(e) => setOnboardingField('firstTimeSetupEnabled', e.target.checked)}
+                  className="mt-0.5 h-4 w-4 text-scalio-700 focus:ring-scalio-600"
+                />
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Allow onboarding tools</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Keep enabled while opening stock and old sales are being entered.</p>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 rounded-lg border border-gray-100 p-3">
+                <input
+                  type="checkbox"
+                  checked={onboardingForm.inventoryOnboardingCompleted ?? false}
+                  onChange={(e) => {
+                    setOnboardingField('inventoryOnboardingCompleted', e.target.checked)
+                    if (e.target.checked) setOnboardingField('firstTimeSetupEnabled', false)
+                  }}
+                  className="mt-0.5 h-4 w-4 text-scalio-700 focus:ring-scalio-600"
+                />
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Mark onboarding complete</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Closes old sale entry and blocks historical import APIs for this tenant.</p>
+                </div>
+              </label>
+
+              <Button size="sm" onClick={() => saveOnboarding.mutate()} disabled={!settings || saveOnboarding.isPending}>
+                Save onboarding
+              </Button>
             </div>
           </Section>
 

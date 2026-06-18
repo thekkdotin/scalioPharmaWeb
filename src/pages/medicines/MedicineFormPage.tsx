@@ -121,7 +121,7 @@ export default function MedicineFormPage() {
   }
 
   const stockPayload = () => {
-    const isSetup = (settings?.firstTimeSetupEnabled ?? true) && stock.entryMode === 'setup'
+    const isSetup = fullHistoryOnboarding && stock.entryMode === 'setup'
     const remaining = Math.max(0, stock.remainingQuantity)
     return {
       batchNumber: stock.batchNumber || undefined,
@@ -187,7 +187,10 @@ export default function MedicineFormPage() {
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); mutation.mutate() }
   const isUsingExisting = !isEdit && !!selectedExisting
-  const firstTimeSetupEnabled = settings?.firstTimeSetupEnabled ?? true
+  const onboardingMode = settings?.inventoryOnboardingMode ?? 'CURRENT_STOCK'
+  const onboardingOpen = (settings?.firstTimeSetupEnabled ?? true) && !(settings?.inventoryOnboardingCompleted ?? false)
+  const fullHistoryOnboarding = onboardingOpen && onboardingMode === 'FULL_HISTORY'
+  const stockSetupMode = fullHistoryOnboarding && stock.entryMode === 'setup'
 
   if (isEdit && isLoading) return <PageLoader />
 
@@ -326,7 +329,7 @@ export default function MedicineFormPage() {
                 <div className="flex flex-wrap gap-2">
                   {([
                     ['current', 'Current stock only'],
-                    ...(firstTimeSetupEnabled ? [['setup', 'First-time totals'] as const] : []),
+                    ...(fullHistoryOnboarding ? [['setup', 'Purchased / sold / remaining'] as const] : []),
                   ] as const).map(([mode, label]) => (
                     <button
                       key={mode}
@@ -343,7 +346,7 @@ export default function MedicineFormPage() {
                   ))}
                 </div>
 
-                {firstTimeSetupEnabled && stock.entryMode === 'setup' && (
+                {fullHistoryOnboarding && stock.entryMode === 'setup' && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-lg border border-amber-100 bg-amber-50 p-3">
                     <Field label="Total Stock Entered *">
                       <input type="number" min={1} value={stock.totalPurchasedQuantity}
@@ -384,9 +387,9 @@ export default function MedicineFormPage() {
                   <input value={stock.batchNumber} onChange={e => setStock(s => ({...s, batchNumber: e.target.value}))}
                     className={inputClass} placeholder="Auto-generated if empty" />
                 </Field>
-                <Field label={stock.entryMode === 'setup' ? 'Current Batch Qty' : 'Quantity *'}>
+                <Field label={stockSetupMode ? 'Current Batch Qty' : 'Quantity *'}>
                   <input type="number" min={1} required={addStock} value={stock.quantity}
-                    disabled={stock.entryMode === 'setup'}
+                    disabled={stockSetupMode}
                     onChange={e => {
                       const qty = Math.max(1, Number(e.target.value))
                       setStock(s => ({...s, quantity: qty, totalPurchasedQuantity: qty, remainingQuantity: qty}))

@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { ApiResponse, PageResponse, Tenant, Subscription } from '@/types'
+import type { ApiResponse, PageResponse, Tenant, Subscription, TenantSettings } from '@/types'
 
 export interface CreateTenantPayload {
   name: string
@@ -68,6 +68,12 @@ export const adminApi = {
   setTenantUserTemporaryPassword: (tenantId: string, userId: string, temporaryPassword: string) =>
     apiClient.put<ApiResponse<TenantUser>>(`${ADMIN}/tenants/${tenantId}/users/${userId}/temporary-password`, { temporaryPassword })
       .then(r => r.data.data),
+
+  getTenantSettings: (tenantId: string) =>
+    apiClient.get<ApiResponse<TenantSettings>>(`/api/v1/tenants/${tenantId}/settings`).then(r => r.data.data),
+
+  updateTenantSettings: (tenantId: string, data: Partial<TenantSettings>) =>
+    apiClient.put<ApiResponse<TenantSettings>>(`/api/v1/tenants/${tenantId}/settings`, data).then(r => r.data.data),
 
   listSubscriptions: () =>
     apiClient.get<ApiResponse<Subscription[]>>(`${ADMIN}/subscriptions`).then(r => r.data.data),
