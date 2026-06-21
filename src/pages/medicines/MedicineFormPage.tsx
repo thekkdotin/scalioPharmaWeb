@@ -12,8 +12,8 @@ import toast from 'react-hot-toast'
 import type { ApiResponse, Medicine, MedicineBatch, Rack, TenantSettings } from '@/types'
 import { Package2 } from 'lucide-react'
 
-const CATEGORIES = ['Tablet', 'Capsule', 'Syrup', 'Injection', 'Ointment', 'Drops', 'Powder', 'Other']
-const UNITS = ['Strip', 'Bottle', 'Box', 'Vial', 'Tube', 'Sachet', 'Piece', 'Pack']
+const CATEGORIES = ['Tablet', 'Capsule', 'Syrup', 'Injection', 'Ointment', 'Drops', 'Powder', 'Pack', 'Other']
+const UNITS = ['Strip', 'Bottle', 'Box', 'Vial', 'Tube', 'Sachet', 'Pieces']
 const GST_RATES = ['0', '5', '12', '18', '28']
 
 const BLANK: Partial<Medicine> = {
@@ -26,9 +26,13 @@ interface OpeningStock {
   entryMode: 'current' | 'setup'
   batchNumber: string
   quantity: number
+  looseQuantity: number
   totalPurchasedQuantity: number
+  totalPurchasedLooseQuantity: number
   totalSoldQuantity: number
+  totalSoldLooseQuantity: number
   remainingQuantity: number
+  remainingLooseQuantity: number
   purchasePrice: number
   sellingPrice: number
   mrp: number
@@ -39,7 +43,8 @@ interface OpeningStock {
 }
 
 const BLANK_STOCK: OpeningStock = {
-  entryMode: 'current', batchNumber: '', quantity: 1, totalPurchasedQuantity: 1, totalSoldQuantity: 0, remainingQuantity: 1,
+  entryMode: 'current', batchNumber: '', quantity: 1, looseQuantity: 0, totalPurchasedQuantity: 1, totalPurchasedLooseQuantity: 0,
+  totalSoldQuantity: 0, totalSoldLooseQuantity: 0, remainingQuantity: 1, remainingLooseQuantity: 0,
   purchasePrice: 0, sellingPrice: 0, mrp: 0, tabletsPerStrip: 1, expiryDate: '', manufactureDate: '', rackLocationId: '',
 }
 
@@ -87,9 +92,13 @@ export default function MedicineFormPage() {
     setStock({
       ...BLANK_STOCK,
       quantity: 1,
+      looseQuantity: 0,
       totalPurchasedQuantity: 1,
+      totalPurchasedLooseQuantity: 0,
       totalSoldQuantity: 0,
+      totalSoldLooseQuantity: 0,
       remainingQuantity: 1,
+      remainingLooseQuantity: 0,
       purchasePrice: batch ? Number((batch.purchasePrice * tps).toFixed(2)) : 0,
       sellingPrice: batch ? Number((batch.sellingPrice * tps).toFixed(2)) : 0,
       mrp: batch?.mrp ? Number((batch.mrp * tps).toFixed(2)) : 0,
@@ -120,15 +129,38 @@ export default function MedicineFormPage() {
     setAddStock(false)
   }
 
+  const unitsPerPack = Math.max(1, stock.tabletsPerStrip || 1)
+  const hasLooseUnits = unitsPerPack > 1
+  const selectedUnit = form.unit || 'Strip'
+  const selectedCategory = form.category || 'Tablet'
+  const packUnitLabel = selectedUnit === 'Pieces' || selectedUnit === 'Piece'
+    ? (selectedCategory === 'Pack' ? 'Pack' : 'Unit')
+    : selectedUnit
+  const looseUnitLabel = selectedUnit === 'Sachet'
+    ? 'Loose sachets'
+    : selectedUnit === 'Pieces' || selectedUnit === 'Piece'
+      ? 'Loose pieces'
+      : 'Loose units'
+  const packLabel = hasLooseUnits ? `Full ${packUnitLabel}${packUnitLabel.endsWith('s') ? '' : 's'}` : 'Quantity'
+  const totalCurrentUnits = stock.quantity * unitsPerPack + (hasLooseUnits ? stock.looseQuantity : 0)
+  const stockTotalUnits = stock.entryMode === 'setup'
+    ? stock.totalPurchasedQuantity * unitsPerPack + (hasLooseUnits ? stock.totalPurchasedLooseQuantity : 0)
+    : totalCurrentUnits
+  const clampLoose = (value: number, tps = unitsPerPack) => Math.min(Math.max(0, value), Math.max(0, tps - 1))
+
   const stockPayload = () => {
     const isSetup = fullHistoryOnboarding && stock.entryMode === 'setup'
     const remaining = Math.max(0, stock.remainingQuantity)
     return {
       batchNumber: stock.batchNumber || undefined,
-      quantity: isSetup ? Math.max(1, remaining) : stock.quantity,
-      totalPurchasedQuantity: isSetup ? Math.max(1, stock.totalPurchasedQuantity) : undefined,
+      quantity: isSetup ? Math.max(0, remaining) : stock.quantity,
+      looseQuantity: !isSetup && hasLooseUnits ? stock.looseQuantity : undefined,
+      totalPurchasedQuantity: isSetup ? Math.max(0, stock.totalPurchasedQuantity) : undefined,
+      totalPurchasedLooseQuantity: isSetup && hasLooseUnits ? stock.totalPurchasedLooseQuantity : undefined,
       totalSoldQuantity: isSetup ? Math.max(0, stock.totalSoldQuantity) : undefined,
+      totalSoldLooseQuantity: isSetup && hasLooseUnits ? stock.totalSoldLooseQuantity : undefined,
       remainingQuantity: isSetup ? remaining : undefined,
+      remainingLooseQuantity: isSetup && hasLooseUnits ? stock.remainingLooseQuantity : undefined,
       purchasePrice: stock.purchasePrice,
       sellingPrice: stock.sellingPrice,
       mrp: stock.mrp > 0 ? stock.mrp : undefined,
@@ -151,7 +183,7 @@ export default function MedicineFormPage() {
         const existing = form.name ? await medicinesApi.findByName(tenantId, form.name) : null
         if (existing) {
           // Medicine exists — just add stock batch if requested, otherwise warn
-          if (addStock && stock.expiryDate && stock.quantity > 0) {
+          if (addStock && stock.expiryDate && stockTotalUnits > 0) {
             await medicinesApi.addBatch(tenantId, existing.id, stockPayload())
             return existing
           } else {
@@ -166,7 +198,7 @@ export default function MedicineFormPage() {
         : medicinesApi.create(tenantId, form))
 
       // Add opening stock for new medicine
-      if (!isEdit && addStock && stock.expiryDate && stock.quantity > 0) {
+      if (!isEdit && addStock && stock.expiryDate && stockTotalUnits > 0) {
         await medicinesApi.addBatch(tenantId, medicine.id, stockPayload())
       }
       return medicine
@@ -348,10 +380,10 @@ export default function MedicineFormPage() {
 
                 {fullHistoryOnboarding && stock.entryMode === 'setup' && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-lg border border-amber-100 bg-amber-50 p-3">
-                    <Field label="Total Stock Entered *">
-                      <input type="number" min={1} value={stock.totalPurchasedQuantity}
+                    <Field label={`Total ${packLabel} *`}>
+                      <input type="number" min={0} value={stock.totalPurchasedQuantity}
                         onChange={e => {
-                          const total = Math.max(1, Number(e.target.value))
+                          const total = Math.max(0, Number(e.target.value))
                           setStock(s => ({
                             ...s,
                             totalPurchasedQuantity: total,
@@ -362,7 +394,14 @@ export default function MedicineFormPage() {
                         }}
                         className={inputClass} />
                     </Field>
-                    <Field label="Old Sold Qty *">
+                    {hasLooseUnits && (
+                      <Field label="Total loose units">
+                        <input type="number" min={0} max={unitsPerPack - 1} value={stock.totalPurchasedLooseQuantity}
+                          onChange={e => setStock(s => ({...s, totalPurchasedLooseQuantity: clampLoose(Number(e.target.value))}))}
+                          className={inputClass} />
+                      </Field>
+                    )}
+                    <Field label={`Old Sold ${hasLooseUnits ? 'packs' : 'Qty'} *`}>
                       <input type="number" min={0} max={stock.totalPurchasedQuantity} value={stock.totalSoldQuantity}
                         onChange={e => {
                           const sold = Math.min(Math.max(0, Number(e.target.value)), stock.totalPurchasedQuantity)
@@ -374,11 +413,25 @@ export default function MedicineFormPage() {
                         }}
                         className={inputClass} />
                     </Field>
-                    <Field label="Current Remaining *">
+                    {hasLooseUnits && (
+                      <Field label="Old sold loose units">
+                        <input type="number" min={0} max={unitsPerPack - 1} value={stock.totalSoldLooseQuantity}
+                          onChange={e => setStock(s => ({...s, totalSoldLooseQuantity: clampLoose(Number(e.target.value))}))}
+                          className={inputClass} />
+                      </Field>
+                    )}
+                    <Field label={`Current Remaining ${hasLooseUnits ? 'packs' : ''} *`}>
                       <input type="number" min={0} max={stock.totalPurchasedQuantity} value={stock.remainingQuantity}
                         onChange={e => setStock(s => ({...s, remainingQuantity: Math.min(Math.max(0, Number(e.target.value)), s.totalPurchasedQuantity)}))}
                         className={inputClass} />
                     </Field>
+                    {hasLooseUnits && (
+                      <Field label="Current loose units">
+                        <input type="number" min={0} max={unitsPerPack - 1} value={stock.remainingLooseQuantity}
+                          onChange={e => setStock(s => ({...s, remainingLooseQuantity: clampLoose(Number(e.target.value))}))}
+                          className={inputClass} />
+                      </Field>
+                    )}
                   </div>
                 )}
 
@@ -387,15 +440,33 @@ export default function MedicineFormPage() {
                   <input value={stock.batchNumber} onChange={e => setStock(s => ({...s, batchNumber: e.target.value}))}
                     className={inputClass} placeholder="Auto-generated if empty" />
                 </Field>
-                <Field label={stockSetupMode ? 'Current Batch Qty' : 'Quantity *'}>
-                  <input type="number" min={1} required={addStock} value={stock.quantity}
+                <Field label={stockSetupMode ? 'Current Batch Qty' : `${packLabel} *`}>
+                  <input type="number" min={0} required={addStock} value={stock.quantity}
                     disabled={stockSetupMode}
                     onChange={e => {
-                      const qty = Math.max(1, Number(e.target.value))
+                      const qty = Math.max(0, Number(e.target.value))
                       setStock(s => ({...s, quantity: qty, totalPurchasedQuantity: qty, remainingQuantity: qty}))
                     }}
                     className={inputClass} />
                 </Field>
+                {!stockSetupMode && (
+                  <Field label={looseUnitLabel}>
+                    <input type="number" min={0} max={hasLooseUnits ? unitsPerPack - 1 : 0} value={stock.looseQuantity}
+                      disabled={!hasLooseUnits}
+                      onChange={e => setStock(s => ({...s, looseQuantity: clampLoose(Number(e.target.value))}))}
+                      className={`${inputClass} disabled:bg-gray-50 disabled:text-gray-400`}
+                      placeholder="Extra loose tablets/sachets/pieces" />
+                    {hasLooseUnits ? (
+                      <p className="text-xs text-pharma-600 mt-1">
+                        Total stock: {totalCurrentUnits} pieces ({stock.quantity} full {packUnitLabel.toLowerCase()}{stock.quantity === 1 ? '' : 's'} + {stock.looseQuantity} loose)
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Set Units per Pack / Strip greater than 1 to enter loose units.
+                      </p>
+                    )}
+                  </Field>
+                )}
                 <Field label="Storage Rack">
                   <select value={stock.rackLocationId} onChange={e => setStock(s => ({...s, rackLocationId: e.target.value}))}
                     className={inputClass}>
@@ -425,10 +496,23 @@ export default function MedicineFormPage() {
                     onChange={e => setStock(s => ({...s, mrp: Number(e.target.value)}))}
                     className={inputClass} placeholder="Max Retail Price per strip/pack" />
                 </Field>
-                <Field label="Tablets / Capsules per Strip">
+                <Field label="Units per Pack / Strip">
                   <input type="number" min={1} step="1" value={stock.tabletsPerStrip}
-                    onChange={e => setStock(s => ({...s, tabletsPerStrip: Math.max(1, parseInt(e.target.value) || 1)}))}
-                    className={inputClass} placeholder="1 = sell as whole unit" />
+                    onChange={e => {
+                      const next = Math.max(1, parseInt(e.target.value) || 1)
+                      setStock(s => ({
+                        ...s,
+                        tabletsPerStrip: next,
+                        looseQuantity: clampLoose(s.looseQuantity, next),
+                        totalPurchasedLooseQuantity: clampLoose(s.totalPurchasedLooseQuantity, next),
+                        totalSoldLooseQuantity: clampLoose(s.totalSoldLooseQuantity, next),
+                        remainingLooseQuantity: clampLoose(s.remainingLooseQuantity, next),
+                      }))
+                    }}
+                    className={inputClass} placeholder="e.g. 10 tabs/strip, 12 sachets/box, 1 bottle" />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Use this for strips, boxes, ORS/Eno sachet packs, or any pack with multiple pieces.
+                  </p>
                   {stock.tabletsPerStrip > 1 && (settings?.showStripsAndTabs ?? false) && (
                     <p className="text-xs text-pharma-600 mt-1">
                       Purchase price/tab: ₹{stock.purchasePrice > 0 ? (stock.purchasePrice / stock.tabletsPerStrip).toFixed(2) : '0.00'}

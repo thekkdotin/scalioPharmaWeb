@@ -1,6 +1,25 @@
 import { apiClient, tenantPath } from './client'
 import type { ApiResponse, Medicine, MedicineStockSummary, PageResponse } from '@/types'
 
+export type OpeningStockPayload = {
+  batchNumber?: string
+  quantity: number
+  looseQuantity?: number
+  totalPurchasedQuantity?: number
+  totalPurchasedLooseQuantity?: number
+  totalSoldQuantity?: number
+  totalSoldLooseQuantity?: number
+  remainingQuantity?: number
+  remainingLooseQuantity?: number
+  purchasePrice: number
+  sellingPrice: number
+  expiryDate: string
+  manufactureDate?: string
+  mrp?: number
+  tabletsPerStrip?: number
+  rackLocationId?: string
+}
+
 export const medicinesApi = {
   list: (tenantId: string, params?: { search?: string; page?: number; size?: number }) =>
     apiClient.get<ApiResponse<PageResponse<Medicine>>>(`${tenantPath(tenantId)}/medicines`, { params })
@@ -23,13 +42,12 @@ export const medicinesApi = {
   delete: (tenantId: string, id: string) =>
     apiClient.delete(`${tenantPath(tenantId)}/medicines/${id}`),
 
-  addBatch: (tenantId: string, medicineId: string, data: {
-    batchNumber?: string; quantity: number; purchasePrice: number;
-    totalPurchasedQuantity?: number; totalSoldQuantity?: number; remainingQuantity?: number;
-    sellingPrice: number; expiryDate: string; manufactureDate?: string;
-    mrp?: number; tabletsPerStrip?: number; rackLocationId?: string;
-  }) =>
+  addBatch: (tenantId: string, medicineId: string, data: OpeningStockPayload) =>
     apiClient.post<ApiResponse<unknown>>(`${tenantPath(tenantId)}/medicines/${medicineId}/batches`, data)
+      .then(r => r.data.data),
+
+  updateBatch: (tenantId: string, medicineId: string, batchId: string, data: OpeningStockPayload) =>
+    apiClient.put<ApiResponse<unknown>>(`${tenantPath(tenantId)}/medicines/${medicineId}/batches/${batchId}`, data)
       .then(r => r.data.data),
 
   findByName: (tenantId: string, name: string) =>
