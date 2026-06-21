@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { PageHeader, Button } from '@/components/shared/PageHeader'
 import { StatCard } from '@/components/shared/StatCard'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
-import { formatCurrency, formatDate, formatStripStock } from '@/lib/utils'
+import { formatCurrency, formatDate, formatStripStock, getStockUnitLabels } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import {
   IndianRupee, ShoppingCart, TrendingUp, Award, Layers,
@@ -31,8 +31,8 @@ function ProfitBadge({ pct }: { pct: number }) {
   )
 }
 
-function formatStockQuantity(quantity: number, tabletsPerStrip?: number, showBoth = false) {
-  return formatStripStock(quantity, tabletsPerStrip, showBoth)
+function formatStockQuantity(quantity: number, tabletsPerStrip?: number, showBoth = false, context?: { category?: string; unit?: string }) {
+  return formatStripStock(quantity, tabletsPerStrip, showBoth, context)
 }
 
 export default function ReportsPage() {
@@ -511,14 +511,14 @@ export default function ReportsPage() {
                           </td>
                           <td className="px-4 py-3 text-gray-500">{item.companyName || '-'}</td>
                           <td className="px-4 py-3 text-blue-600 font-medium whitespace-nowrap">
-                            {formatStockQuantity(item.totalPurchased, item.tabletsPerStrip, settings?.showStripsAndTabs ?? false)}
+                            {formatStockQuantity(item.totalPurchased, item.tabletsPerStrip, settings?.showStripsAndTabs ?? false, item)}
                           </td>
                           <td className="px-4 py-3 text-orange-500 font-medium whitespace-nowrap">
-                            {formatStockQuantity(item.totalSold, item.tabletsPerStrip, settings?.showStripsAndTabs ?? false)}
+                            {formatStockQuantity(item.totalSold, item.tabletsPerStrip, settings?.showStripsAndTabs ?? false, item)}
                           </td>
                           <td className="px-4 py-3">
                             <span className={`font-bold whitespace-nowrap ${item.remaining === 0 ? 'text-red-500' : item.remaining < 10 ? 'text-amber-500' : 'text-green-600'}`}>
-                              {formatStockQuantity(item.remaining, item.tabletsPerStrip, settings?.showStripsAndTabs ?? false)}
+                              {formatStockQuantity(item.remaining, item.tabletsPerStrip, settings?.showStripsAndTabs ?? false, item)}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-xs text-gray-400">{item.batches.length} batch{item.batches.length !== 1 ? 'es' : ''}</td>
@@ -535,23 +535,23 @@ export default function ReportsPage() {
                               {batch.expired && <span className="ml-1 text-red-500">(Expired)</span>}
                             </td>
                             <td className="px-4 py-2 text-xs text-blue-500 whitespace-nowrap">
-                              {formatStockQuantity(batch.purchaseQuantity, batch.tabletsPerStrip, settings?.showStripsAndTabs ?? false)}
+                              {formatStockQuantity(batch.purchaseQuantity, batch.tabletsPerStrip, settings?.showStripsAndTabs ?? false, item)}
                             </td>
                             <td className="px-4 py-2 text-xs text-orange-400 whitespace-nowrap">
-                              {formatStockQuantity(batch.purchaseQuantity - batch.remainingQuantity, batch.tabletsPerStrip, settings?.showStripsAndTabs ?? false)}
+                              {formatStockQuantity(batch.purchaseQuantity - batch.remainingQuantity, batch.tabletsPerStrip, settings?.showStripsAndTabs ?? false, item)}
                             </td>
                             <td className="px-4 py-2 text-xs font-semibold text-green-600 whitespace-nowrap">
-                              {formatStockQuantity(batch.remainingQuantity, batch.tabletsPerStrip, settings?.showStripsAndTabs ?? false)}
+                              {formatStockQuantity(batch.remainingQuantity, batch.tabletsPerStrip, settings?.showStripsAndTabs ?? false, item)}
                             </td>
                             <td className="px-4 py-2 text-xs text-gray-400">
                               <div className="flex items-center gap-2 justify-between">
                                 <span>{batch.rackLocation && `Rack: ${batch.rackLocation}`}</span>
                                 <span>
                                   Sell: {batch.tabletsPerStrip > 1
-                                    ? `${formatCurrency(batch.sellingPrice * batch.tabletsPerStrip)}/strip`
+                                    ? `${formatCurrency(batch.sellingPrice * batch.tabletsPerStrip)}/${getStockUnitLabels(item).pack}`
                                     : formatCurrency(batch.sellingPrice)}
                                   {(settings?.showStripsAndTabs ?? false) && batch.tabletsPerStrip > 1
-                                    ? ` (${formatCurrency(batch.sellingPrice)}/tab)`
+                                    ? ` (${formatCurrency(batch.sellingPrice)}/${getStockUnitLabels(item).loose})`
                                     : ''}
                                 </span>
                               </div>

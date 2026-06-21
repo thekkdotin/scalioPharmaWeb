@@ -129,6 +129,9 @@ export default function OrdersPage() {
           supplierId: selectedSupplier?.id,
           supplierName: selectedSupplier?.name,
           currentStock: inv?.remaining ?? medicine.totalStock ?? 0,
+          category: medicine.category,
+          unit: medicine.unit,
+          tabletsPerStrip: inv?.tabletsPerStrip ?? medicine.tabletsPerStrip,
           reason,
         },
       ]
@@ -149,6 +152,9 @@ export default function OrdersPage() {
         supplierId: selectedSupplier?.id,
         supplierName: selectedSupplier?.name,
         currentStock: item.remaining,
+        category: item.category,
+        unit: item.unit,
+        tabletsPerStrip: item.tabletsPerStrip,
         reason: 'Out of stock',
       }))
 
@@ -163,6 +169,9 @@ export default function OrdersPage() {
         supplierId: selectedSupplier?.id,
         supplierName: selectedSupplier?.name,
         currentStock: item.remaining,
+        category: item.category,
+        unit: item.unit,
+        tabletsPerStrip: item.tabletsPerStrip,
         reason: 'Low stock <= 20',
       }))
 
@@ -178,6 +187,9 @@ export default function OrdersPage() {
           supplierId: selectedSupplier?.id,
           supplierName: selectedSupplier?.name,
           currentStock: inv.remaining,
+          category: inv.category,
+          unit: inv.unit,
+          tabletsPerStrip: inv.tabletsPerStrip,
           reason: `High selling (${item.totalQuantity} sold in 30 days)`,
         }
       })
@@ -310,7 +322,7 @@ export default function OrdersPage() {
                     <span className="font-medium text-sm">{medicine.name}</span>
                     <span className="text-xs text-gray-400 ml-2">{medicine.companyName}</span>
                   </span>
-                  <span className="text-xs text-gray-500">{formatStripStock(medicine.totalStock ?? 0, medicine.tabletsPerStrip, true)}</span>
+                  <span className="text-xs text-gray-500">{formatStripStock(medicine.totalStock ?? 0, medicine.tabletsPerStrip, true, medicine)}</span>
                 </button>
               ))}
             </div>
@@ -347,7 +359,9 @@ export default function OrdersPage() {
                   <tr key={line.id}>
                     <td className="px-3 py-2 font-medium">{line.medicineName}</td>
                     <td className="px-3 py-2"><input type="number" min={1} value={line.quantity} onChange={e => setLines(lines.map(l => l.id === line.id ? { ...l, quantity: Math.max(1, Number(e.target.value) || 1) } : l))} className="w-20 px-2 py-1 border rounded" /></td>
-                    <td className="px-3 py-2 text-gray-500">{line.currentStock ?? '-'}</td>
+                    <td className="px-3 py-2 text-gray-500">
+                      {line.currentStock == null ? '-' : formatStripStock(line.currentStock, line.tabletsPerStrip, true, line)}
+                    </td>
                     <td className="px-3 py-2 text-gray-500">{line.supplierName || '-'}</td>
                     <td className="px-3 py-2 text-gray-500">{line.reason}</td>
                     <td className="px-3 py-2 text-right"><button onClick={() => setLines(lines.filter(l => l.id !== line.id))} className="text-red-500"><Trash2 className="w-4 h-4" /></button></td>

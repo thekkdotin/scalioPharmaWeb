@@ -5,7 +5,7 @@ import { salesApi, type CreateSalePayload } from '@/api/sales'
 import { apiClient, tenantPath } from '@/api/client'
 import { useAuthStore } from '@/store/useAuthStore'
 import { usePosStore } from '@/store/usePosStore'
-import { formatCompactStripStock, formatCurrency } from '@/lib/utils'
+import { formatCompactStripStock, formatCurrency, getStockUnitLabels, type StockLabelContext } from '@/lib/utils'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchInput } from '@/components/shared/SearchInput'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -60,25 +60,27 @@ export default function PosPage() {
   const allowLooseSale = settings?.allowLooseSale ?? true
   const showBothStockAndTabPrice = settings?.showStripsAndTabs ?? false
 
-  const priceInfo = (pricePerTab: number | undefined, tps: number, label: string) => {
+  const priceInfo = (pricePerTab: number | undefined, tps: number, label: string, context?: StockLabelContext) => {
     if (pricePerTab == null) return null
     if (tps > 1) {
       const stripPrice = pricePerTab * tps
+      const labels = getStockUnitLabels(context)
       return (
         <span className="text-xs text-gray-500">
-          {label}: {formatCurrency(stripPrice)}/strip
-          {showBothStockAndTabPrice && <span className="text-gray-400"> ({formatCurrency(pricePerTab)}/tab)</span>}
+          {label}: {formatCurrency(stripPrice)}/{labels.pack}
+          {showBothStockAndTabPrice && <span className="text-gray-400"> ({formatCurrency(pricePerTab)}/{labels.loose})</span>}
         </span>
       )
     }
     return <span className="text-xs text-gray-500">{label}: {formatCurrency(pricePerTab)}</span>
   }
 
-  const salePriceLabel = (pricePerTab: number, tps: number) => {
+  const salePriceLabel = (pricePerTab: number, tps: number, context?: StockLabelContext) => {
     if (tps <= 1) return formatCurrency(pricePerTab)
-    const stripLabel = `${formatCurrency(pricePerTab * tps)}/strip`
+    const labels = getStockUnitLabels(context)
+    const stripLabel = `${formatCurrency(pricePerTab * tps)}/${labels.pack}`
     return showBothStockAndTabPrice
-      ? `${stripLabel} (${formatCurrency(pricePerTab)}/tab)`
+      ? `${stripLabel} (${formatCurrency(pricePerTab)}/${labels.loose})`
       : stripLabel
   }
 
@@ -284,7 +286,7 @@ export default function PosPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-gray-500">
-                      Stock: {formatCompactStripStock(med.totalStock ?? 0, med.tabletsPerStrip, showBothStockAndTabPrice)}
+                      Stock: {formatCompactStripStock(med.totalStock ?? 0, med.tabletsPerStrip, showBothStockAndTabPrice, med)}
                     </p>
                     <Plus className="w-4 h-4 text-pharma-600 ml-auto" />
                   </div>
@@ -320,6 +322,7 @@ export default function PosPage() {
                 const rawPriceInput = priceEditMap[item.medicineId]
                 const strips = Math.floor(item.quantity / tps)
                 const looseTabs = item.quantity % tps
+                const labels = getStockUnitLabels(item)
 
                 return (
                 <div key={item.medicineId} className="flex flex-col px-4 py-3 gap-1.5">
@@ -330,17 +333,17 @@ export default function PosPage() {
 
                       {/* Per-unit price details */}
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        {priceInfo(item.purchasePrice, tps, 'Cost')}
-                        {priceInfo(item.unitPrice, tps, 'Sell')}
+                        {priceInfo(item.purchasePrice, tps, 'Cost', item)}
+                        {priceInfo(item.unitPrice, tps, 'Sell', item)}
                         {item.mrp != null && (
                           <span className="text-xs text-amber-600">
-                            MRP: {tps > 1 ? `${formatCurrency(item.mrp * tps)}/strip` : formatCurrency(item.mrp)}
-                            {showBothStockAndTabPrice && tps > 1 && <span className="text-amber-500"> ({formatCurrency(item.mrp)}/tab)</span>}
+                            MRP: {tps > 1 ? `${formatCurrency(item.mrp * tps)}/${labels.pack}` : formatCurrency(item.mrp)}
+                            {showBothStockAndTabPrice && tps > 1 && <span className="text-amber-500"> ({formatCurrency(item.mrp)}/{labels.loose})</span>}
                           </span>
                         )}
                         {showBothStockAndTabPrice && tps > 1 && (
                           <span className="text-xs font-medium bg-pharma-50 text-pharma-600 px-1.5 py-0.5 rounded">
-                            {tps} tabs/strip
+                            {tps} {labels.loosePlural}/{labels.pack}
                           </span>
                         )}
                       </div>
@@ -360,7 +363,7 @@ export default function PosPage() {
                         /* Strip counter + loose tab counter */
                         <>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-gray-500 w-10 text-right">Strip</span>
+                            <span className="text-xs text-gray-500 w-10 text-right capitalize">{labels.pack}</span>
                             <button
                               onClick={() => {
                                 if (strips <= 0) return
@@ -378,7 +381,7 @@ export default function PosPage() {
                           </div>
                           {allowLooseSale && (
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-gray-500 w-10 text-right">Tab</span>
+                              <span className="text-xs text-gray-500 w-10 text-right capitalize">{labels.loose}</span>
                               <button
                                 onClick={() => {
                                   if (item.quantity <= 1) return store.removeItem(item.medicineId)
@@ -394,7 +397,7 @@ export default function PosPage() {
                             </div>
                           )}
                           {showBothStockAndTabPrice && (
-                            <span className="text-xs text-gray-400 pr-0.5">{item.quantity} tabs total</span>
+                            <span className="text-xs text-gray-400 pr-0.5">{item.quantity} {labels.loosePlural} total</span>
                           )}
                         </>
                       ) : (
@@ -459,10 +462,10 @@ export default function PosPage() {
                         >
                           {item.customUnitPrice != null ? (
                             <span className="font-semibold text-pharma-700">
-                              {salePriceLabel(displayPrice, tps)}
+                              {salePriceLabel(displayPrice, tps, item)}
                             </span>
                           ) : (
-                            <span>{salePriceLabel(displayPrice, tps)}</span>
+                            <span>{salePriceLabel(displayPrice, tps, item)}</span>
                           )}
                           <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 text-pharma-500" />
                         </button>

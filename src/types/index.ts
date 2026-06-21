@@ -227,6 +227,8 @@ export interface Sale {
 export interface CartItem {
   medicineId: string
   medicineName: string
+  category?: string
+  unit?: string
   batchId?: string
   batchNumber?: string
   expiryDate?: string
@@ -405,6 +407,9 @@ export interface PurchaseOrderLine {
   supplierId?: string
   supplierName?: string
   currentStock?: number
+  category?: string
+  unit?: string
+  tabletsPerStrip?: number
   reason?: string
 }
 
@@ -424,6 +429,7 @@ export interface MedicineInventoryItem {
   medicineName: string
   companyName: string
   category?: string
+  unit?: string
   totalPurchased: number
   totalSold: number
   remaining: number

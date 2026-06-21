@@ -10,41 +10,12 @@ import { Badge, Button } from '@/components/shared/PageHeader'
 import { Plus, Edit, Package, ChevronRight, ChevronDown, X, Trash2 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiClient, tenantPath } from '@/api/client'
+import { formatStripStock, getStockUnitLabels } from '@/lib/utils'
 import type { Medicine, MedicineBatch, MedicineStockSummary, TenantSettings, ApiResponse } from '@/types'
 import toast from 'react-hot-toast'
 
-function plural(value: number, singular: string, pluralLabel = `${singular}s`) {
-  return value === 1 ? singular : pluralLabel
-}
-
-function unitLabels(medicine?: Pick<Medicine, 'category' | 'unit'>) {
-  const category = medicine?.category?.toLowerCase() || ''
-  const unit = medicine?.unit?.toLowerCase() || ''
-  if (unit === 'sachet') return { pack: 'pack', packs: 'packs', loose: 'sachet', loosePlural: 'sachets' }
-  if (category === 'pack' || unit === 'pack' || unit === 'box') {
-    return { pack: unit === 'box' ? 'box' : 'pack', packs: unit === 'box' ? 'boxes' : 'packs', loose: 'piece', loosePlural: 'pieces' }
-  }
-  if (unit === 'piece' || unit === 'pieces') return { pack: 'pack', packs: 'packs', loose: 'piece', loosePlural: 'pieces' }
-  return { pack: 'strip', packs: 'strips', loose: 'tab', loosePlural: 'tabs' }
-}
-
 function formatStock(quantity: number, tps: number | undefined, showBoth: boolean, medicine?: Pick<Medicine, 'category' | 'unit'>): string {
-  const total = Number(quantity ?? 0)
-  const unitsPerPack = tps && tps > 1 ? tps : 1
-  const labels = unitLabels(medicine)
-  if (unitsPerPack === 1) return `${total}`
-
-  const packs = Math.floor(total / unitsPerPack)
-  const loose = total % unitsPerPack
-  if (!showBoth) {
-    const exactPacks = total / unitsPerPack
-    const formatted = Number.isInteger(exactPacks) ? `${exactPacks}` : exactPacks.toFixed(2).replace(/\.?0+$/, '')
-    return `${formatted} ${exactPacks === 1 ? labels.pack : labels.packs}`
-  }
-
-  const packLabel = `${packs} ${packs === 1 ? labels.pack : labels.packs}`
-  const looseLabel = loose > 0 ? `, ${loose} ${plural(loose, labels.loose, labels.loosePlural)}` : ''
-  return `${packLabel}${looseLabel} (${total} ${plural(total, labels.loose, labels.loosePlural)})`
+  return formatStripStock(quantity, tps, showBoth, medicine)
 }
 
 function stockLabel(quantity: number, tps: number | undefined, showBoth: boolean, medicine?: Pick<Medicine, 'category' | 'unit'>): string {
@@ -136,8 +107,6 @@ export default function MedicinesPage() {
         batchNumber: adjustForm.batchNumber || undefined,
         quantity: Math.max(0, adjustForm.purchasePacks),
         looseQuantity: unitsPerPack > 1 ? adjustForm.purchaseLoose : undefined,
-        totalPurchasedQuantity: Math.max(0, adjustForm.purchasePacks),
-        totalPurchasedLooseQuantity: unitsPerPack > 1 ? adjustForm.purchaseLoose : undefined,
         remainingQuantity: Math.max(0, adjustForm.remainingPacks),
         remainingLooseQuantity: unitsPerPack > 1 ? adjustForm.remainingLoose : undefined,
         purchasePrice: adjustForm.purchasePrice,
@@ -511,7 +480,7 @@ export default function MedicinesPage() {
                                     {summary.batches.map(batch => {
                                       const btps = batch.tabletsPerStrip
                                       const sold = batch.purchaseQuantity - batch.remainingQuantity
-                                      const labels = unitLabels(med)
+                                      const labels = getStockUnitLabels(med)
                                       return (
                                         <tr key={batch.id} className="hover:bg-white/60">
                                           <td className="py-1.5 font-mono font-semibold text-pharma-700">{batch.batchNumber}</td>

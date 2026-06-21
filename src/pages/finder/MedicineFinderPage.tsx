@@ -72,7 +72,7 @@ export default function MedicineFinderPage() {
                     )}
                   </div>
                   <p className={`text-sm font-bold ${(medicine.totalStock ?? 0) > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {formatStripStock(medicine.totalStock ?? 0, medicine.tabletsPerStrip, showBoth)}
+                    {formatStripStock(medicine.totalStock ?? 0, medicine.tabletsPerStrip, showBoth, medicine)}
                   </p>
                 </div>
               </button>
@@ -97,9 +97,9 @@ export default function MedicineFinderPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Info label="Current Stock" value={formatStripStock(summary?.totalRemaining ?? selected.totalStock ?? 0, selected.tabletsPerStrip, showBoth)} />
-                <Info label="Total Purchased" value={summary ? formatStripStock(summary.totalPurchased, selected.tabletsPerStrip, showBoth) : '-'} />
-                <Info label="Total Sold" value={summary ? formatStripStock(summary.totalSold, selected.tabletsPerStrip, showBoth) : '-'} />
+                <Info label="Current Stock" value={formatStripStock(summary?.totalRemaining ?? selected.totalStock ?? 0, selected.tabletsPerStrip, showBoth, selected)} />
+                <Info label="Total Purchased" value={summary ? formatStripStock(summary.totalPurchased, selected.tabletsPerStrip, showBoth, selected) : '-'} />
+                <Info label="Total Sold" value={summary ? formatStripStock(summary.totalSold, selected.tabletsPerStrip, showBoth, selected) : '-'} />
               </div>
 
               <div className="border border-gray-100 rounded-lg overflow-hidden">
@@ -116,7 +116,7 @@ export default function MedicineFinderPage() {
                         <td className="px-4 py-3">
                           <span className={batch.isExpired ? 'text-red-500 font-medium' : 'text-gray-600'}>{formatDate(batch.expiryDate)}</span>
                         </td>
-                        <td className="px-4 py-3 font-semibold text-green-600">{formatStripStock(batch.remainingQuantity, batch.tabletsPerStrip, showBoth)}</td>
+                        <td className="px-4 py-3 font-semibold text-green-600">{formatStripStock(batch.remainingQuantity, batch.tabletsPerStrip, showBoth, selected)}</td>
                         <td className="px-4 py-3">
                           {batch.rackLocation ? (
                             <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-1 rounded">
@@ -137,7 +137,7 @@ export default function MedicineFinderPage() {
                     {alternatives.map(medicine => (
                       <button key={medicine.id} onClick={() => setSelected(medicine)} className="text-left rounded-lg border border-gray-100 p-3 hover:bg-pharma-50">
                         <p className="font-medium text-sm">{medicine.name}</p>
-                        <p className="text-xs text-green-600">{formatStripStock(medicine.totalStock ?? 0, medicine.tabletsPerStrip, showBoth)}</p>
+                        <p className="text-xs text-green-600">{formatStripStock(medicine.totalStock ?? 0, medicine.tabletsPerStrip, showBoth, medicine)}</p>
                       </button>
                     ))}
                   </div>

@@ -36,7 +36,27 @@ export function formatDateTime(date: string | undefined | null): string {
 }
 
 /** Days until expiry */
-/** Format tablet stock with its strip breakdown. Quantities are stored as tablets. */
+export type StockLabelContext = {
+  category?: string | null
+  unit?: string | null
+}
+
+export function getStockUnitLabels(context?: StockLabelContext) {
+  const category = context?.category?.toLowerCase() || ''
+  const unit = context?.unit?.toLowerCase() || ''
+  if (unit === 'sachet') return { pack: 'pack', packs: 'packs', loose: 'sachet', loosePlural: 'sachets' }
+  if (category === 'pack' || unit === 'pack' || unit === 'box') {
+    return { pack: unit === 'box' ? 'box' : 'pack', packs: unit === 'box' ? 'boxes' : 'packs', loose: 'piece', loosePlural: 'pieces' }
+  }
+  if (unit === 'piece' || unit === 'pieces') return { pack: 'pack', packs: 'packs', loose: 'piece', loosePlural: 'pieces' }
+  return { pack: 'strip', packs: 'strips', loose: 'tab', loosePlural: 'tabs' }
+}
+
+function plural(value: number, singular: string, pluralLabel = `${singular}s`) {
+  return value === 1 ? singular : pluralLabel
+}
+
+/** Format stock with pack/loose breakdown. Quantities are stored in smallest units. */
 function formatNumber(value: number): string {
   return Number.isInteger(value) ? `${value}` : value.toFixed(2).replace(/\.?0+$/, '')
 }
@@ -44,45 +64,55 @@ function formatNumber(value: number): string {
 export function formatStripStock(
   quantity: number | undefined | null,
   tabletsPerStrip?: number | null,
-  showBoth = true
+  showBoth = true,
+  context?: StockLabelContext
 ): string {
   const total = Number(quantity ?? 0)
   const tps = tabletsPerStrip && tabletsPerStrip > 1 ? tabletsPerStrip : 1
   if (tps === 1) return `${total}`
 
-  const strips = Math.floor(total / tps)
-  const tabs = total % tps
-  const stripLabel = `${strips} strip${strips === 1 ? '' : 's'}`
+  const labels = getStockUnitLabels(context)
+  const packs = Math.floor(total / tps)
+  const loose = total % tps
+  const packLabel = `${packs} ${packs === 1 ? labels.pack : labels.packs}`
+  const looseLabel = loose > 0 ? `, ${loose} ${plural(loose, labels.loose, labels.loosePlural)}` : ''
+  if (loose > 0) {
+    return `${packLabel}${looseLabel} (${total} ${plural(total, labels.loose, labels.loosePlural)})`
+  }
   if (!showBoth) {
-    const exactStrips = total / tps
-    return `${formatNumber(exactStrips)} strip${exactStrips === 1 ? '' : 's'}`
+    const exactPacks = total / tps
+    return `${formatNumber(exactPacks)} ${exactPacks === 1 ? labels.pack : labels.packs}`
   }
 
-  const tabLabel = tabs > 0 ? `, ${tabs} tab${tabs === 1 ? '' : 's'}` : ''
-  return `${stripLabel}${tabLabel} (${total} tabs)`
+  return `${packLabel}${looseLabel} (${total} ${plural(total, labels.loose, labels.loosePlural)})`
 }
 
 /** Short stock label for compact POS search rows. */
 export function formatCompactStripStock(
   quantity: number | undefined | null,
   tabletsPerStrip?: number | null,
-  showBoth = true
+  showBoth = true,
+  context?: StockLabelContext
 ): string {
   const total = Number(quantity ?? 0)
   const tps = tabletsPerStrip && tabletsPerStrip > 1 ? tabletsPerStrip : 1
   if (tps === 1) return `${total}`
 
-  const strips = Math.floor(total / tps)
-  const tabs = total % tps
+  const labels = getStockUnitLabels(context)
+  const packs = Math.floor(total / tps)
+  const loose = total % tps
+  if (loose > 0) {
+    return `${packs} ${packs === 1 ? labels.pack : labels.packs}, ${loose} ${plural(loose, labels.loose, labels.loosePlural)} (${total} ${plural(total, labels.loose, labels.loosePlural)})`
+  }
   if (!showBoth) {
-    const exactStrips = total / tps
-    return `${formatNumber(exactStrips)} strip${exactStrips === 1 ? '' : 's'}`
+    const exactPacks = total / tps
+    return `${formatNumber(exactPacks)} ${exactPacks === 1 ? labels.pack : labels.packs}`
   }
 
-  const breakdown = tabs > 0
-    ? `${strips} strips, ${tabs} tabs`
-    : `${strips} strip${strips === 1 ? '' : 's'}`
-  return `${breakdown} (${total} tabs)`
+  const breakdown = loose > 0
+    ? `${packs} ${packs === 1 ? labels.pack : labels.packs}, ${loose} ${plural(loose, labels.loose, labels.loosePlural)}`
+    : `${packs} ${packs === 1 ? labels.pack : labels.packs}`
+  return `${breakdown} (${total} ${plural(total, labels.loose, labels.loosePlural)})`
 }
 
 export function daysUntilExpiry(expiryDate: string): number {

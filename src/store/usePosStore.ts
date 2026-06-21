@@ -109,6 +109,8 @@ export const usePosStore = create<PosState>((set, get) => ({
       const newItem: CartItem = {
         medicineId: medicine.id,
         medicineName: medicine.name,
+        category: medicine.category,
+        unit: medicine.unit,
         batchId: firstBatch?.id,
         batchNumber: firstBatch?.batchNumber,
         expiryDate: firstBatch?.expiryDate,
