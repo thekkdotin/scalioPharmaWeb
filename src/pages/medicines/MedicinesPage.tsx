@@ -31,6 +31,7 @@ export default function MedicinesPage() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [batchCache, setBatchCache] = useState<Record<string, MedicineStockSummary>>({})
   const [adjusting, setAdjusting] = useState<{ medicine: Medicine; batch: MedicineBatch } | null>(null)
+  const [adjustError, setAdjustError] = useState('')
   const [adjustForm, setAdjustForm] = useState({
     batchNumber: '',
     expiryDate: '',
@@ -79,6 +80,7 @@ export default function MedicinesPage() {
 
   const beginAdjust = (medicine: Medicine, batch: MedicineBatch) => {
     const tps = batch.tabletsPerStrip && batch.tabletsPerStrip > 1 ? batch.tabletsPerStrip : 1
+    setAdjustError('')
     setAdjusting({ medicine, batch })
     setAdjustForm({
       batchNumber: batch.batchNumber,
@@ -101,6 +103,7 @@ export default function MedicinesPage() {
   const adjustMutation = useMutation({
     mutationFn: async () => {
       if (!adjusting) return
+      setAdjustError('')
       const { medicine, batch } = adjusting
       const unitsPerPack = adjustForm.unitsPerPack > 1 ? adjustForm.unitsPerPack : 1
       await medicinesApi.updateBatch(tenantId, medicine.id, batch.id, {
@@ -123,11 +126,16 @@ export default function MedicinesPage() {
         const summary = await medicinesApi.getById(tenantId, adjusting.medicine.id)
         setBatchCache(prev => ({ ...prev, [adjusting.medicine.id]: summary }))
       }
-      queryClient.invalidateQueries({ queryKey: ['medicines', tenantId] })
+      await queryClient.invalidateQueries({ queryKey: ['medicines', tenantId] })
+      await queryClient.refetchQueries({ queryKey: ['medicines', tenantId], type: 'active' })
       toast.success('Batch updated')
       setAdjusting(null)
     },
-    onError: (err: any) => toast.error(err?.response?.data?.message || 'Failed to update batch'),
+    onError: (err: any) => {
+      const message = err?.response?.data?.message || err?.message || 'Failed to update batch'
+      setAdjustError(message)
+      toast.error(message)
+    },
   })
 
   const deleteMutation = useMutation({
@@ -149,6 +157,7 @@ export default function MedicinesPage() {
     + (adjustingUnitsPerPack > 1 ? adjustForm.purchaseLoose : 0)
   const adjustingRemainingTotal = adjustForm.remainingPacks * adjustingUnitsPerPack
     + (adjustingUnitsPerPack > 1 ? adjustForm.remainingLoose : 0)
+  const adjustingLabels = getStockUnitLabels(adjusting?.medicine)
   const canSaveAdjustment = !!adjustForm.batchNumber.trim() && !!adjustForm.expiryDate
     && adjustForm.purchasePrice >= 0 && adjustForm.sellingPrice > 0
     && adjustingPurchasedTotal > 0 && adjustingRemainingTotal >= 0
@@ -268,7 +277,7 @@ export default function MedicinesPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 border-t border-gray-100 pt-4">
-                <Field label={adjustingUnitsPerPack > 1 ? 'Purchased packs' : 'Purchased units'}>
+                <Field label={adjustingUnitsPerPack > 1 ? `Purchased ${adjustingLabels.packs}` : `Purchased ${adjustingLabels.loosePlural}`}>
                   <input
                     type="number"
                     min={0}
@@ -278,7 +287,7 @@ export default function MedicinesPage() {
                   />
                 </Field>
                 {adjustingUnitsPerPack > 1 && (
-                  <Field label="Purchased loose">
+                  <Field label={`Purchased loose ${adjustingLabels.loosePlural}`}>
                     <input
                       type="number"
                       min={0}
@@ -289,7 +298,7 @@ export default function MedicinesPage() {
                     />
                   </Field>
                 )}
-                <Field label={adjustingUnitsPerPack > 1 ? 'Remaining packs' : 'Remaining units'}>
+                <Field label={adjustingUnitsPerPack > 1 ? `Remaining ${adjustingLabels.packs}` : `Remaining ${adjustingLabels.loosePlural}`}>
                   <input
                     type="number"
                     min={0}
@@ -299,7 +308,7 @@ export default function MedicinesPage() {
                   />
                 </Field>
                 {adjustingUnitsPerPack > 1 && (
-                  <Field label="Remaining loose">
+                  <Field label={`Remaining loose ${adjustingLabels.loosePlural}`}>
                     <input
                       type="number"
                       min={0}
@@ -312,8 +321,11 @@ export default function MedicinesPage() {
                 )}
               </div>
               <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-                Purchased total: {adjustingPurchasedTotal} units · Remaining total: {adjustingRemainingTotal} units
+                Purchased total: {adjustingPurchasedTotal} {adjustingLabels.loosePlural} · Remaining total: {adjustingRemainingTotal} {adjustingLabels.loosePlural}
               </div>
+              {adjustError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{adjustError}</p>
+              )}
               {!canSaveAdjustment && (
                 <p className="text-xs text-red-500">Enter batch number, valid prices, expiry date, and remaining stock between 0 and purchased stock.</p>
               )}
