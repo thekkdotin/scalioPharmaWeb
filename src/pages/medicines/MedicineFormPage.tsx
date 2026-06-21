@@ -150,21 +150,23 @@ export default function MedicineFormPage() {
 
   const stockPayload = () => {
     const isSetup = fullHistoryOnboarding && stock.entryMode === 'setup'
+    const payloadUnitsPerPack = Math.max(1, Number(stock.tabletsPerStrip) || 1)
+    const payloadHasLooseUnits = payloadUnitsPerPack > 1
     const remaining = Math.max(0, stock.remainingQuantity)
     return {
       batchNumber: stock.batchNumber || undefined,
       quantity: isSetup ? Math.max(0, remaining) : stock.quantity,
-      looseQuantity: !isSetup && hasLooseUnits ? stock.looseQuantity : undefined,
+      looseQuantity: !isSetup && payloadHasLooseUnits ? clampLoose(Number(stock.looseQuantity) || 0, payloadUnitsPerPack) : undefined,
       totalPurchasedQuantity: isSetup ? Math.max(0, stock.totalPurchasedQuantity) : undefined,
-      totalPurchasedLooseQuantity: isSetup && hasLooseUnits ? stock.totalPurchasedLooseQuantity : undefined,
+      totalPurchasedLooseQuantity: isSetup && payloadHasLooseUnits ? clampLoose(Number(stock.totalPurchasedLooseQuantity) || 0, payloadUnitsPerPack) : undefined,
       totalSoldQuantity: isSetup ? Math.max(0, stock.totalSoldQuantity) : undefined,
-      totalSoldLooseQuantity: isSetup && hasLooseUnits ? stock.totalSoldLooseQuantity : undefined,
+      totalSoldLooseQuantity: isSetup && payloadHasLooseUnits ? clampLoose(Number(stock.totalSoldLooseQuantity) || 0, payloadUnitsPerPack) : undefined,
       remainingQuantity: isSetup ? remaining : undefined,
-      remainingLooseQuantity: isSetup && hasLooseUnits ? stock.remainingLooseQuantity : undefined,
+      remainingLooseQuantity: isSetup && payloadHasLooseUnits ? clampLoose(Number(stock.remainingLooseQuantity) || 0, payloadUnitsPerPack) : undefined,
       purchasePrice: stock.purchasePrice,
       sellingPrice: stock.sellingPrice,
       mrp: stock.mrp > 0 ? stock.mrp : undefined,
-      tabletsPerStrip: stock.tabletsPerStrip > 1 ? stock.tabletsPerStrip : undefined,
+      tabletsPerStrip: payloadUnitsPerPack > 1 ? payloadUnitsPerPack : undefined,
       expiryDate: stock.expiryDate,
       manufactureDate: stock.manufactureDate || undefined,
       rackLocationId: stock.rackLocationId || undefined,
@@ -440,6 +442,24 @@ export default function MedicineFormPage() {
                   <input value={stock.batchNumber} onChange={e => setStock(s => ({...s, batchNumber: e.target.value}))}
                     className={inputClass} placeholder="Auto-generated if empty" />
                 </Field>
+                <Field label="Units per Pack / Strip">
+                  <input type="number" min={1} step="1" value={stock.tabletsPerStrip}
+                    onChange={e => {
+                      const next = Math.max(1, parseInt(e.target.value) || 1)
+                      setStock(s => ({
+                        ...s,
+                        tabletsPerStrip: next,
+                        looseQuantity: clampLoose(s.looseQuantity, next),
+                        totalPurchasedLooseQuantity: clampLoose(s.totalPurchasedLooseQuantity, next),
+                        totalSoldLooseQuantity: clampLoose(s.totalSoldLooseQuantity, next),
+                        remainingLooseQuantity: clampLoose(s.remainingLooseQuantity, next),
+                      }))
+                    }}
+                    className={inputClass} placeholder="e.g. 10 pieces/pack, 10 tabs/strip" />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Enter this first to enable loose pieces/tablets.
+                  </p>
+                </Field>
                 <Field label={stockSetupMode ? 'Current Batch Qty' : `${packLabel} *`}>
                   <input type="number" min={0} required={addStock} value={stock.quantity}
                     disabled={stockSetupMode}
@@ -496,7 +516,7 @@ export default function MedicineFormPage() {
                     onChange={e => setStock(s => ({...s, mrp: Number(e.target.value)}))}
                     className={inputClass} placeholder="Max Retail Price per strip/pack" />
                 </Field>
-                <Field label="Units per Pack / Strip">
+                <div className="hidden">
                   <input type="number" min={1} step="1" value={stock.tabletsPerStrip}
                     onChange={e => {
                       const next = Math.max(1, parseInt(e.target.value) || 1)
@@ -520,7 +540,7 @@ export default function MedicineFormPage() {
                       {stock.mrp > 0 && <>&nbsp;·&nbsp;MRP/tab: ₹{(stock.mrp / stock.tabletsPerStrip).toFixed(2)}</>}
                     </p>
                   )}
-                </Field>
+                </div>
                 <Field label="Manufacture Date">
                   <input type="date" value={stock.manufactureDate}
                     onChange={e => setStock(s => ({...s, manufactureDate: e.target.value}))}
