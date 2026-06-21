@@ -667,7 +667,7 @@ export default function MedicinesPage() {
                 <Package className="w-12 h-12 text-gray-200 mx-auto mb-3" />
                 <p className="text-gray-400 text-sm">No medicines found</p>
                 <Link to="/medicines/new" className="mt-2 inline-block text-sm text-pharma-600 hover:underline">
-                  Add your first medicine ->
+                  Add your first medicine
                 </Link>
               </div>
             )}
