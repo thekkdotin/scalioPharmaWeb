@@ -5,19 +5,31 @@ import { format, parseISO } from 'date-fns'
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
-
-/** Format currency in Indian Rupee format: ₹1,00,000.00 */
-export function formatCurrency(amount: number, symbol = '₹'): string {
+/** Format currency in Indian Rupee format: INR symbol + 1,00,000.00 */
+export function formatCurrency(amount: number, symbol = '\u20B9'): string {
   const formatted = new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
   return `${symbol}${formatted}`
 }
+/** Clean text that was previously rendered with mojibake separators/symbols. */
+export function cleanDisplayText(value: string | undefined | null, fallback = ''): string {
+  if (!value) return fallback
+  return value
+    .replace(/ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·|ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·|Ãƒâ€šÃ‚Â·/g, ' - ')
+    .replace(/ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢|ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢|ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢/g, ' - ')
+    .replace(/ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â|ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â|ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â/g, '-')
+    .replace(/ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦|ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦|ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦/g, '...')
+    .replace(/ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¹|ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹|ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹|Ã¢â€šÂ¹/g, '\u20B9')
+    .replace(/\s+-\s+-\s+/g, ' - ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
 
 /** Format date: DD/MM/YYYY */
 export function formatDate(date: string | undefined | null): string {
-  if (!date) return '—'
+  if (!date) return '-'
   try {
     return format(parseISO(date), 'dd/MM/yyyy')
   } catch {
@@ -27,7 +39,7 @@ export function formatDate(date: string | undefined | null): string {
 
 /** Format datetime: DD/MM/YYYY HH:mm */
 export function formatDateTime(date: string | undefined | null): string {
-  if (!date) return '—'
+  if (!date) return '-'
   try {
     return format(parseISO(date), 'dd/MM/yyyy HH:mm')
   } catch {
@@ -44,7 +56,28 @@ export type StockLabelContext = {
 export function getStockUnitLabels(context?: StockLabelContext) {
   const category = context?.category?.toLowerCase() || ''
   const unit = context?.unit?.toLowerCase() || ''
-  if (unit === 'sachet') return { pack: 'pack', packs: 'packs', loose: 'sachet', loosePlural: 'sachets' }
+
+  if (category === 'capsule') {
+    return { pack: 'strip', packs: 'strips', loose: 'capsule', loosePlural: 'capsules' }
+  }
+  if (category === 'tablet' || unit === 'strip') {
+    return { pack: 'strip', packs: 'strips', loose: 'tab', loosePlural: 'tabs' }
+  }
+  if (category === 'injection' || unit === 'vial' || unit === 'vials') {
+    return { pack: 'box', packs: 'boxes', loose: 'vial', loosePlural: 'vials' }
+  }
+  if (category === 'syrup' || unit === 'bottle' || unit === 'bottles') {
+    return { pack: 'box', packs: 'boxes', loose: 'bottle', loosePlural: 'bottles' }
+  }
+  if (category === 'ointment' || unit === 'tube' || unit === 'tubes') {
+    return { pack: 'box', packs: 'boxes', loose: 'tube', loosePlural: 'tubes' }
+  }
+  if (category === 'drops') {
+    return { pack: 'box', packs: 'boxes', loose: 'bottle', loosePlural: 'bottles' }
+  }
+  if (category === 'powder' || unit === 'sachet' || unit === 'sachets') {
+    return { pack: 'pack', packs: 'packs', loose: 'sachet', loosePlural: 'sachets' }
+  }
   if (category === 'pack' || unit === 'pack' || unit === 'box') {
     return { pack: unit === 'box' ? 'box' : 'pack', packs: unit === 'box' ? 'boxes' : 'packs', loose: 'piece', loosePlural: 'pieces' }
   }
@@ -69,21 +102,13 @@ export function formatStripStock(
 ): string {
   const total = Number(quantity ?? 0)
   const tps = tabletsPerStrip && tabletsPerStrip > 1 ? tabletsPerStrip : 1
-  if (tps === 1) return `${total}`
 
   const labels = getStockUnitLabels(context)
+  if (tps === 1) return `${total} ${plural(total, labels.loose, labels.loosePlural)}`
   const packs = Math.floor(total / tps)
   const loose = total % tps
   const packLabel = `${packs} ${packs === 1 ? labels.pack : labels.packs}`
   const looseLabel = loose > 0 ? `, ${loose} ${plural(loose, labels.loose, labels.loosePlural)}` : ''
-  if (loose > 0) {
-    return `${packLabel}${looseLabel} (${total} ${plural(total, labels.loose, labels.loosePlural)})`
-  }
-  if (!showBoth) {
-    const exactPacks = total / tps
-    return `${formatNumber(exactPacks)} ${exactPacks === 1 ? labels.pack : labels.packs}`
-  }
-
   return `${packLabel}${looseLabel} (${total} ${plural(total, labels.loose, labels.loosePlural)})`
 }
 
@@ -96,19 +121,11 @@ export function formatCompactStripStock(
 ): string {
   const total = Number(quantity ?? 0)
   const tps = tabletsPerStrip && tabletsPerStrip > 1 ? tabletsPerStrip : 1
-  if (tps === 1) return `${total}`
 
   const labels = getStockUnitLabels(context)
+  if (tps === 1) return `${total} ${plural(total, labels.loose, labels.loosePlural)}`
   const packs = Math.floor(total / tps)
   const loose = total % tps
-  if (loose > 0) {
-    return `${packs} ${packs === 1 ? labels.pack : labels.packs}, ${loose} ${plural(loose, labels.loose, labels.loosePlural)} (${total} ${plural(total, labels.loose, labels.loosePlural)})`
-  }
-  if (!showBoth) {
-    const exactPacks = total / tps
-    return `${formatNumber(exactPacks)} ${exactPacks === 1 ? labels.pack : labels.packs}`
-  }
-
   const breakdown = loose > 0
     ? `${packs} ${packs === 1 ? labels.pack : labels.packs}, ${loose} ${plural(loose, labels.loose, labels.loosePlural)}`
     : `${packs} ${packs === 1 ? labels.pack : labels.packs}`

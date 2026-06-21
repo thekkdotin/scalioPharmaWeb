@@ -11,9 +11,20 @@ import { PageLoader } from '@/components/shared/LoadingSpinner'
 import toast from 'react-hot-toast'
 import type { ApiResponse, Medicine, MedicineBatch, Rack, TenantSettings } from '@/types'
 import { Package2 } from 'lucide-react'
+import { getStockUnitLabels } from '@/lib/utils'
 
 const CATEGORIES = ['Tablet', 'Capsule', 'Syrup', 'Injection', 'Ointment', 'Drops', 'Powder', 'Pack', 'Other']
 const UNITS = ['Strip', 'Bottle', 'Box', 'Vial', 'Tube', 'Sachet', 'Pieces']
+const DEFAULT_UNIT_BY_CATEGORY: Record<string, string> = {
+  Tablet: 'Strip',
+  Capsule: 'Strip',
+  Syrup: 'Bottle',
+  Injection: 'Vial',
+  Ointment: 'Tube',
+  Drops: 'Bottle',
+  Powder: 'Sachet',
+  Pack: 'Pieces',
+}
 const GST_RATES = ['0', '5', '12', '18', '28']
 
 const BLANK: Partial<Medicine> = {
@@ -133,15 +144,9 @@ export default function MedicineFormPage() {
   const hasLooseUnits = unitsPerPack > 1
   const selectedUnit = form.unit || 'Strip'
   const selectedCategory = form.category || 'Tablet'
-  const packUnitLabel = selectedUnit === 'Pieces' || selectedUnit === 'Piece'
-    ? (selectedCategory === 'Pack' ? 'Pack' : 'Unit')
-    : selectedUnit
-  const looseUnitLabel = selectedUnit === 'Sachet'
-    ? 'Loose sachets'
-    : selectedUnit === 'Pieces' || selectedUnit === 'Piece'
-      ? 'Loose pieces'
-      : 'Loose units'
-  const packLabel = hasLooseUnits ? `Full ${packUnitLabel}${packUnitLabel.endsWith('s') ? '' : 's'}` : 'Quantity'
+  const stockLabels = getStockUnitLabels({ category: selectedCategory, unit: selectedUnit })
+  const packLabel = hasLooseUnits ? `Full ${stockLabels.packs}` : `Quantity (${stockLabels.loosePlural})`
+  const looseUnitLabel = `Loose ${stockLabels.loosePlural}`
   const totalCurrentUnits = stock.quantity * unitsPerPack + (hasLooseUnits ? stock.looseQuantity : 0)
   const stockTotalUnits = stock.entryMode === 'setup'
     ? stock.totalPurchasedQuantity * unitsPerPack + (hasLooseUnits ? stock.totalPurchasedLooseQuantity : 0)
@@ -218,6 +223,9 @@ export default function MedicineFormPage() {
   })
 
   const setField = (field: keyof Medicine, value: any) => setForm(f => ({ ...f, [field]: value }))
+  const setCategory = (category: string) => {
+    setForm(f => ({ ...f, category, unit: DEFAULT_UNIT_BY_CATEGORY[category] || f.unit || 'Strip' }))
+  }
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); mutation.mutate() }
   const isUsingExisting = !isEdit && !!selectedExisting
@@ -294,7 +302,7 @@ export default function MedicineFormPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Category">
-                <select value={form.category || 'Tablet'} disabled={isUsingExisting} onChange={(e) => setField('category', e.target.value)} className={inputClass}>
+                <select value={form.category || 'Tablet'} disabled={isUsingExisting} onChange={(e) => setCategory(e.target.value)} className={inputClass}>
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </Field>
@@ -443,7 +451,7 @@ export default function MedicineFormPage() {
                     className={inputClass} placeholder="Auto-generated if empty" />
                 </Field>
                 <Field label="Units per Pack / Strip">
-                  <input type="number" min={1} step="1" value={stock.tabletsPerStrip}
+                    <input type="number" min={1} step="1" value={stock.tabletsPerStrip}
                     onChange={e => {
                       const next = Math.max(1, parseInt(e.target.value) || 1)
                       setStock(s => ({
@@ -455,9 +463,9 @@ export default function MedicineFormPage() {
                         remainingLooseQuantity: clampLoose(s.remainingLooseQuantity, next),
                       }))
                     }}
-                    className={inputClass} placeholder="e.g. 10 pieces/pack, 10 tabs/strip" />
+                    className={inputClass} placeholder={`e.g. 10 ${stockLabels.loosePlural}/${stockLabels.pack}`} />
                   <p className="text-xs text-gray-400 mt-1">
-                    Enter this first to enable loose pieces/tablets.
+                    Enter this first to enable loose {stockLabels.loosePlural}.
                   </p>
                 </Field>
                 <Field label={stockSetupMode ? 'Current Batch Qty' : `${packLabel} *`}>
@@ -478,7 +486,7 @@ export default function MedicineFormPage() {
                       placeholder="Extra loose tablets/sachets/pieces" />
                     {hasLooseUnits ? (
                       <p className="text-xs text-pharma-600 mt-1">
-                        Total stock: {totalCurrentUnits} pieces ({stock.quantity} full {packUnitLabel.toLowerCase()}{stock.quantity === 1 ? '' : 's'} + {stock.looseQuantity} loose)
+                        Total stock: {totalCurrentUnits} {stockLabels.loosePlural} ({stock.quantity} full {stockLabels.packs} + {stock.looseQuantity} loose)
                       </p>
                     ) : (
                       <p className="text-xs text-gray-400 mt-1">
@@ -535,9 +543,9 @@ export default function MedicineFormPage() {
                   </p>
                   {stock.tabletsPerStrip > 1 && (settings?.showStripsAndTabs ?? false) && (
                     <p className="text-xs text-pharma-600 mt-1">
-                      Purchase price/tab: ₹{stock.purchasePrice > 0 ? (stock.purchasePrice / stock.tabletsPerStrip).toFixed(2) : '0.00'}
-                      &nbsp;·&nbsp;Selling price/tab: ₹{stock.sellingPrice > 0 ? (stock.sellingPrice / stock.tabletsPerStrip).toFixed(2) : '0.00'}
-                      {stock.mrp > 0 && <>&nbsp;·&nbsp;MRP/tab: ₹{(stock.mrp / stock.tabletsPerStrip).toFixed(2)}</>}
+                      Purchase price/{stockLabels.loose}: ₹{stock.purchasePrice > 0 ? (stock.purchasePrice / stock.tabletsPerStrip).toFixed(2) : '0.00'}
+                      &nbsp;·&nbsp;Selling price/{stockLabels.loose}: ₹{stock.sellingPrice > 0 ? (stock.sellingPrice / stock.tabletsPerStrip).toFixed(2) : '0.00'}
+                      {stock.mrp > 0 && <>&nbsp;·&nbsp;MRP/{stockLabels.loose}: ₹{(stock.mrp / stock.tabletsPerStrip).toFixed(2)}</>}
                     </p>
                   )}
                 </div>

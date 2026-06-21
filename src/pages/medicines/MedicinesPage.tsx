@@ -10,7 +10,7 @@ import { Badge, Button } from '@/components/shared/PageHeader'
 import { Plus, Edit, Package, ChevronRight, ChevronDown, X, Trash2 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiClient, tenantPath } from '@/api/client'
-import { formatStripStock, getStockUnitLabels } from '@/lib/utils'
+import { cleanDisplayText, formatCurrency, formatStripStock, getStockUnitLabels } from '@/lib/utils'
 import type { Medicine, MedicineBatch, MedicineStockSummary, TenantSettings, ApiResponse } from '@/types'
 import toast from 'react-hot-toast'
 
@@ -20,6 +20,46 @@ function formatStock(quantity: number, tps: number | undefined, showBoth: boolea
 
 function stockLabel(quantity: number, tps: number | undefined, showBoth: boolean, medicine?: Pick<Medicine, 'category' | 'unit'>): string {
   return formatStock(quantity, tps, showBoth, medicine)
+}
+
+function medicineMeta(...values: Array<string | undefined | null>) {
+  return values.map(value => cleanDisplayText(value)).filter(Boolean).join(' - ')
+}
+
+function PriceCell({
+  value,
+  tps,
+  labels,
+  tone = 'default',
+}: {
+  value?: number | null
+  tps?: number | null
+  labels: ReturnType<typeof getStockUnitLabels>
+  tone?: 'default' | 'sell' | 'mrp'
+}) {
+  if (value == null || value <= 0) return <span className="text-gray-300">-</span>
+
+  const unitsPerPack = tps && tps > 1 ? tps : 1
+  const primaryClass = tone === 'sell'
+    ? 'text-green-700'
+    : tone === 'mrp'
+      ? 'text-amber-600'
+      : 'text-gray-700'
+
+  return (
+    <div className="inline-flex min-w-[118px] flex-col items-end leading-tight">
+      <span className={`font-semibold ${primaryClass}`}>
+        {unitsPerPack > 1
+          ? `${formatCurrency(value * unitsPerPack)}/${labels.pack}`
+          : `${formatCurrency(value)}/${labels.loose}`}
+      </span>
+      {unitsPerPack > 1 && (
+        <span className="mt-0.5 rounded bg-gray-50 px-1.5 py-0.5 text-[11px] font-medium text-gray-500">
+          {formatCurrency(value)}/{labels.loose}
+        </span>
+      )}
+    </div>
+  )
 }
 
 export default function MedicinesPage() {
@@ -181,7 +221,7 @@ export default function MedicinesPage() {
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div>
                 <h2 className="font-bold text-lg">Edit Batch</h2>
-                <p className="text-xs text-gray-400 mt-0.5">{adjusting.medicine.name} · Batch {adjusting.batch.batchNumber}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{cleanDisplayText(adjusting.medicine.name)} - Batch {cleanDisplayText(adjusting.batch.batchNumber)}</p>
               </div>
               <button type="button" onClick={() => setAdjusting(null)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
@@ -321,7 +361,7 @@ export default function MedicinesPage() {
                 )}
               </div>
               <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-                Purchased total: {adjustingPurchasedTotal} {adjustingLabels.loosePlural} · Remaining total: {adjustingRemainingTotal} {adjustingLabels.loosePlural}
+                Purchased total: {adjustingPurchasedTotal} {adjustingLabels.loosePlural} - Remaining total: {adjustingRemainingTotal} {adjustingLabels.loosePlural}
               </div>
               {adjustError && (
                 <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{adjustError}</p>
@@ -381,7 +421,8 @@ export default function MedicinesPage() {
                     const low = tabs === 0 || tabs <= (med.minStockAlert ?? 10)
                     const isExpanded = expandedIds.has(med.id)
                     const summary = batchCache[med.id]
-                    const categoryUnit = [med.category, med.unit].filter(Boolean).join(' Â· ')
+                    const categoryUnit = medicineMeta(med.category, med.unit)
+                    const genericCompany = medicineMeta(med.genericName, med.companyName)
                     return (
                       <Fragment key={med.id}>
                       <tr className={`hover:bg-gray-50 transition ${isExpanded ? 'bg-pharma-50/30' : ''}`}>
@@ -398,18 +439,16 @@ export default function MedicinesPage() {
                                 : <ChevronRight className="w-4 h-4" />}
                             </button>
                             <div>
-                              <p className="font-semibold text-gray-800">{med.name}</p>
-                              <p className="text-xs text-gray-400 mt-0.5">
-                                {[med.genericName, med.companyName].filter(Boolean).join(' · ')}
-                              </p>
+                              <p className="font-semibold text-gray-800">{cleanDisplayText(med.name)}</p>
+                              {genericCompany && <p className="text-xs text-gray-400 mt-0.5">{genericCompany}</p>}
                               {categoryUnit && <p className="text-xs text-gray-400 mt-0.5">{categoryUnit}</p>}
-                              {med.barcode && <p className="text-xs text-gray-300 mt-0.5">{med.barcode}</p>}
+                              {med.barcode && <p className="text-xs text-gray-300 mt-0.5">{cleanDisplayText(med.barcode)}</p>}
                             </div>
                           </div>
                         </td>
 
                         {/* Category */}
-                        <td className="px-4 py-3 text-gray-600 text-xs">{med.category || '—'}</td>
+                        <td className="px-4 py-3 text-gray-600 text-xs">{cleanDisplayText(med.category, '-')}</td>
 
                         {/* Tabs/Strip */}
                         <td className="px-4 py-3 text-center">
@@ -467,7 +506,7 @@ export default function MedicinesPage() {
                         <tr className="bg-slate-50/70">
                           <td colSpan={7} className="px-0 py-0">
                             {!summary ? (
-                              <div className="px-8 py-2 text-xs text-gray-400 italic">Loading batches…</div>
+                              <div className="px-8 py-2 text-xs text-gray-400 italic">Loading batches...</div>
                             ) : summary.batches.length === 0 ? (
                               <div className="px-8 py-2 text-xs text-gray-400 italic">No batches on record.</div>
                             ) : (
@@ -495,14 +534,14 @@ export default function MedicinesPage() {
                                       const labels = getStockUnitLabels(med)
                                       return (
                                         <tr key={batch.id} className="hover:bg-white/60">
-                                          <td className="py-1.5 font-mono font-semibold text-pharma-700">{batch.batchNumber}</td>
+                                          <td className="py-1.5 font-mono font-semibold text-pharma-700">{cleanDisplayText(batch.batchNumber)}</td>
                                           <td className="py-1.5">
                                             {batch.rackLocation ? (
                                               <span className="inline-block bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs font-medium">
                                                 Rack: {batch.rackLocation}
                                               </span>
                                             ) : (
-                                              <span className="text-gray-300 text-xs">—</span>
+                                              <span className="text-gray-300 text-xs">-</span>
                                             )}
                                           </td>
                                           <td className={`py-1.5 ${batch.isExpired ? 'text-red-500 font-medium' : 'text-gray-500'}`}>{batch.expiryDate}</td>
@@ -510,32 +549,13 @@ export default function MedicinesPage() {
                                           <td className="py-1.5 text-right text-orange-500 whitespace-nowrap">{formatStock(sold, btps, settings?.showStripsAndTabs ?? false, med)}</td>
                                           <td className={`py-1.5 text-right font-bold whitespace-nowrap ${batch.remainingQuantity === 0 ? 'text-red-400' : 'text-green-600'}`}>{formatStock(batch.remainingQuantity, btps, settings?.showStripsAndTabs ?? false, med)}</td>
                                           <td className="py-1.5 text-right">
-                                            <span className="text-gray-600">
-                                              {btps > 1 ? `₹${(batch.purchasePrice * btps).toFixed(2)}/${labels.pack}` : `₹${batch.purchasePrice.toFixed(2)}`}
-                                            </span>
-                                            {(settings?.showStripsAndTabs ?? false) && btps > 1 && (
-                                              <span className="block text-gray-400">₹{batch.purchasePrice.toFixed(2)}/{labels.loose}</span>
-                                            )}
+                                            <PriceCell value={batch.purchasePrice} tps={btps} labels={labels} />
                                           </td>
                                           <td className="py-1.5 text-right">
-                                            <span className="text-green-700 font-semibold">
-                                              {btps > 1 ? `₹${(batch.sellingPrice * btps).toFixed(2)}/${labels.pack}` : `₹${batch.sellingPrice.toFixed(2)}`}
-                                            </span>
-                                            {(settings?.showStripsAndTabs ?? false) && btps > 1 && (
-                                              <span className="block text-gray-400">₹{batch.sellingPrice.toFixed(2)}/{labels.loose}</span>
-                                            )}
+                                            <PriceCell value={batch.sellingPrice} tps={btps} labels={labels} tone="sell" />
                                           </td>
                                           <td className="py-1.5 text-right">
-                                            {batch.mrp ? (
-                                              <>
-                                                <span className="text-amber-600">
-                                                  {btps > 1 ? `₹${(batch.mrp * btps).toFixed(2)}/${labels.pack}` : `₹${batch.mrp.toFixed(2)}`}
-                                                </span>
-                                                {(settings?.showStripsAndTabs ?? false) && btps > 1 && (
-                                                  <span className="block text-gray-400">₹{batch.mrp.toFixed(2)}/{labels.loose}</span>
-                                                )}
-                                              </>
-                                            ) : <span className="text-gray-300">—</span>}
+                                            <PriceCell value={batch.mrp} tps={btps} labels={labels} tone="mrp" />
                                           </td>
                                           <td className="py-1.5 text-center">
                                             <Badge variant={batch.isExpired ? 'danger' : 'success'}>
@@ -575,7 +595,8 @@ export default function MedicinesPage() {
               {data?.content?.map((med: Medicine) => {
                 const tps = med.tabletsPerStrip
                 const tabs = med.totalStock ?? 0
-                const categoryUnit = [med.category, med.unit].filter(Boolean).join(' Â· ')
+                const categoryUnit = medicineMeta(med.category, med.unit)
+                const genericCompany = medicineMeta(med.genericName, med.companyName)
                 return (
                   <div key={med.id} className="px-4 py-3">
                     <div className="flex items-start justify-between">
@@ -584,10 +605,10 @@ export default function MedicinesPage() {
                           <Package className="w-5 h-5 text-pharma-600" />
                         </div>
                         <div>
-                          <p className="font-semibold text-gray-800 text-sm">{med.name}</p>
+                          <p className="font-semibold text-gray-800 text-sm">{cleanDisplayText(med.name)}</p>
                           {categoryUnit && <p className="text-xs text-gray-400">{categoryUnit}</p>}
-                          <p className="text-xs text-gray-400">{med.genericName} · {med.companyName}</p>
-                          <p className="text-xs text-gray-400">{med.category} · GST {med.gstPercentage}%</p>
+                          {genericCompany && <p className="text-xs text-gray-400">{genericCompany}</p>}
+                          <p className="text-xs text-gray-400">{cleanDisplayText(med.category)} - GST {med.gstPercentage}%</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -610,7 +631,7 @@ export default function MedicinesPage() {
                     <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                       <div className="bg-gray-50 rounded px-2 py-1 text-center">
                           <p className="text-gray-400">Units/Pack</p>
-                        <p className="font-semibold text-gray-700">{tps && tps > 1 ? tps : '—'}</p>
+                        <p className="font-semibold text-gray-700">{tps && tps > 1 ? tps : '-'}</p>
                       </div>
                       <div className="bg-gray-50 rounded px-2 py-1 text-center">
                         <p className="text-gray-400">Stock</p>
@@ -646,7 +667,7 @@ export default function MedicinesPage() {
                 <Package className="w-12 h-12 text-gray-200 mx-auto mb-3" />
                 <p className="text-gray-400 text-sm">No medicines found</p>
                 <Link to="/medicines/new" className="mt-2 inline-block text-sm text-pharma-600 hover:underline">
-                  Add your first medicine →
+                  Add your first medicine ->
                 </Link>
               </div>
             )}
