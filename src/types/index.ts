@@ -189,7 +189,9 @@ export interface SaleItem {
   medicineName: string
   batchId: string
   batchNumber: string
+  expiryDate?: string
   quantity: number
+  tabletsPerStrip: number
   unitPrice: number
   purchasePrice: number
   discountPercent: number
@@ -482,4 +484,11 @@ export interface TenantSettings {
   inventoryOnboardingMode: 'CURRENT_STOCK' | 'FULL_HISTORY'
   /** Hides and blocks onboarding-only tools once setup is complete. */
   inventoryOnboardingCompleted: boolean
+  /** Enables the scheduled daily sales and profit email. */
+  dailySalesEmailEnabled: boolean
+  /** Comma-separated recipient email addresses. */
+  dailySalesEmailRecipients?: string
+  /** Daily send time in Asia/Kolkata, HH:mm format. */
+  dailySalesEmailTime: string
+  dailySalesEmailLastSentDate?: string
 }

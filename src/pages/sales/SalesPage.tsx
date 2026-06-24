@@ -7,9 +7,11 @@ import { SearchInput } from '@/components/shared/SearchInput'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { Badge, Button } from '@/components/shared/PageHeader'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
-import { Eye } from 'lucide-react'
+import { downloadReceipt, formatReceiptQuantity, printReceipt } from '@/lib/receipt'
+import { apiClient, tenantPath } from '@/api/client'
+import { Download, Eye, Printer } from 'lucide-react'
 import toast from 'react-hot-toast'
-import type { Sale, PaymentMode } from '@/types'
+import type { ApiResponse, Sale, PaymentMode, Tenant, TenantSettings } from '@/types'
 
 export default function SalesPage() {
   const tenantId = useAuthStore((s) => s.tenantId())!
@@ -25,8 +27,24 @@ export default function SalesPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['sales', tenantId, search, page, from, to],
-    queryFn: () => salesApi.list(tenantId, { page, size: 20, from: from || undefined, to: to || undefined }),
+    queryFn: () => salesApi.list(tenantId, { page, size: 20, search: search || undefined, from: from || undefined, to: to || undefined }),
     placeholderData: (prev) => prev,
+  })
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings', tenantId],
+    queryFn: () => apiClient.get<ApiResponse<TenantSettings>>(`${tenantPath(tenantId)}/settings`).then(r => r.data.data),
+  })
+
+  const { data: tenantProfile } = useQuery({
+    queryKey: ['tenant-profile', tenantId],
+    queryFn: () => apiClient.get<ApiResponse<Tenant>>(`${tenantPath(tenantId)}/settings/profile`).then(r => r.data.data),
+  })
+
+  const saleDetailMutation = useMutation({
+    mutationFn: (saleId: string) => salesApi.getById(tenantId, saleId),
+    onSuccess: setSelected,
+    onError: (err: any) => toast.error(err?.response?.data?.message || 'Failed to load invoice'),
   })
 
   // Payment history for the open sale
@@ -67,6 +85,13 @@ export default function SalesPage() {
 
   const payStatusVariant = (s: string) =>
     s === 'PAID' ? 'success' : s === 'PARTIAL' ? 'warning' : 'danger'
+
+  const printSelectedReceipt = () => {
+    if (!selected) return
+    if (!printReceipt({ sale: selected, tenant: tenantProfile, settings })) {
+      toast.error('Allow pop-ups to print this receipt')
+    }
+  }
 
   return (
     <div>
@@ -112,7 +137,12 @@ export default function SalesPage() {
                         <Badge variant={statusVariant(sale.status)}>{sale.status.replace('_', ' ')}</Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <button onClick={() => setSelected(sale)} className="text-pharma-500 hover:text-pharma-700">
+                        <button
+                          onClick={() => saleDetailMutation.mutate(sale.id)}
+                          disabled={saleDetailMutation.isPending}
+                          className="text-pharma-500 hover:text-pharma-700 disabled:opacity-40"
+                          title="View invoice"
+                        >
                           <Eye className="w-4 h-4" />
                         </button>
                       </td>
@@ -125,7 +155,11 @@ export default function SalesPage() {
             {/* Mobile */}
             <div className="md:hidden divide-y divide-gray-50">
               {data?.content?.map((sale: Sale) => (
-                <div key={sale.id} className="px-4 py-3 flex items-center justify-between" onClick={() => setSelected(sale)}>
+                <button
+                  key={sale.id}
+                  className="w-full px-4 py-3 flex items-center justify-between text-left"
+                  onClick={() => saleDetailMutation.mutate(sale.id)}
+                >
                   <div>
                     <p className="text-sm font-semibold text-pharma-700">{sale.invoiceNumber}</p>
                     <p className="text-xs text-gray-500">{sale.patientName || 'Walk-in'} • {formatDate(sale.createdAt)}</p>
@@ -134,7 +168,7 @@ export default function SalesPage() {
                     <p className="font-bold text-sm">{formatCurrency(sale.totalAmount)}</p>
                     <Badge variant={statusVariant(sale.status)}>{sale.status.replace('_', ' ')}</Badge>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
 
@@ -179,7 +213,9 @@ export default function SalesPage() {
                   {selected.items?.map((item: any) => (
                     <tr key={item.id} className="border-b border-gray-50">
                       <td className="py-2">{item.medicineName}</td>
-                      <td className="py-2 text-right text-gray-500">{item.quantity}</td>
+                      <td className="py-2 text-right text-gray-500 whitespace-nowrap">
+                        {formatReceiptQuantity(item.quantity, item.tabletsPerStrip)}
+                      </td>
                       <td className="py-2 text-right">{formatCurrency(item.totalAmount)}</td>
                     </tr>
                   ))}
@@ -240,6 +276,18 @@ export default function SalesPage() {
                   </div>
                 </div>
               )}
+
+              <div className="border-t border-gray-100 pt-4 flex flex-wrap gap-2">
+                <Button onClick={printSelectedReceipt}>
+                  <Printer className="w-4 h-4" /> Print / Save PDF
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => selected && downloadReceipt({ sale: selected, tenant: tenantProfile, settings })}
+                >
+                  <Download className="w-4 h-4" /> Download Receipt
+                </Button>
+              </div>
             </div>
           </div>
         </div>

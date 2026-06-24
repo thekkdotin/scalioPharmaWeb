@@ -6,12 +6,13 @@ import { apiClient, tenantPath } from '@/api/client'
 import { useAuthStore } from '@/store/useAuthStore'
 import { usePosStore } from '@/store/usePosStore'
 import { cleanDisplayText, formatCompactStripStock, formatCurrency, getStockUnitLabels, type StockLabelContext } from '@/lib/utils'
+import { printReceipt } from '@/lib/receipt'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SearchInput } from '@/components/shared/SearchInput'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Trash2, Plus, Minus, Printer, ShoppingCart, X, Percent, IndianRupee, Check, Edit2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import type { Medicine, PaymentMode, TenantSettings, ApiResponse } from '@/types'
+import type { Medicine, PaymentMode, Tenant, TenantSettings, ApiResponse } from '@/types'
 
 
 export default function PosPage() {
@@ -56,6 +57,10 @@ export default function PosPage() {
     queryKey: ['settings', tenantId],
     queryFn: () => apiClient.get<ApiResponse<TenantSettings>>(`${tenantPath(tenantId)}/settings`).then(r => r.data.data),
     staleTime: 60_000,
+  })
+  const { data: tenantProfile } = useQuery({
+    queryKey: ['tenant-profile', tenantId],
+    queryFn: () => apiClient.get<ApiResponse<Tenant>>(`${tenantPath(tenantId)}/settings/profile`).then(r => r.data.data),
   })
   const allowLooseSale = settings?.allowLooseSale ?? true
   const showBothStockAndTabPrice = settings?.showStripsAndTabs ?? false
@@ -161,58 +166,9 @@ export default function PosPage() {
 
   const handlePrint = () => {
     if (!saleCreated) return
-    const win = window.open('', '_blank', 'width=420,height=680')
-    if (!win) return
-    const items = (saleCreated.items ?? []).map((item: any) => {
-      const batchInfo = [
-        item.batchNumber ? `Batch: ${item.batchNumber}` : '',
-        item.expiryDate ? `Exp: ${item.expiryDate}` : '',
-      ].filter(Boolean).join(' - ')
-      return `<tr>
-        <td>
-          <div>${cleanDisplayText(item.medicineName)}</div>
-          ${batchInfo ? `<div style="font-size:9px;color:#888;font-family:monospace">${batchInfo}</div>` : ''}
-        </td>
-        <td style="text-align:center">${item.quantity}</td>
-        <td style="text-align:right">\u20B9${Number(item.totalAmount).toFixed(2)}</td>
-      </tr>`
-    }).join('')
-    const change = saleCreated.changeAmount > 0
-      ? `<tr><td>Change</td><td></td><td style="text-align:right">\u20B9${Number(saleCreated.changeAmount).toFixed(2)}</td></tr>` : ''
-    const balance = saleCreated.balanceDue > 0
-      ? `<tr><td><strong>Balance Due</strong></td><td></td><td style="text-align:right"><strong>\u20B9${Number(saleCreated.balanceDue).toFixed(2)}</strong></td></tr>` : ''
-    win.document.write(`<!DOCTYPE html><html><head><title>Invoice - ${saleCreated.invoiceNumber}</title>
-    <style>
-      body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:16px;max-width:300px}
-      h2{text-align:center;margin:0 0 4px;font-size:14px}
-      .center{text-align:center;color:#555;font-size:11px}
-      table{width:100%;border-collapse:collapse;margin:8px 0}
-      th{background:#f5f5f5;padding:4px 6px;text-align:left;font-size:11px}
-      td{padding:3px 6px;border-bottom:1px solid #eee}
-      .totals td{border:none;padding:2px 6px}
-      .grand td{font-weight:bold;font-size:13px;padding:4px 6px;border-top:2px solid #333}
-      .footer{text-align:center;color:#888;font-size:10px;margin-top:10px}
-      @media print{@page{size:80mm auto;margin:0}body{padding:8px}}
-    </style></head><body>
-    <h2>${user?.tenantName ?? 'Pharmacy'}</h2>
-    <p class="center">Invoice: <strong>${saleCreated.invoiceNumber}</strong></p>
-    <p class="center">${new Date().toLocaleString()}</p>
-    <hr/>
-    <table><thead><tr><th>Item</th><th>Qty</th><th style="text-align:right">Amt</th></tr></thead>
-    <tbody>${items}</tbody></table>
-    <hr/>
-    <table class="totals">
-      <tr><td>Subtotal</td><td></td><td style="text-align:right">\u20B9${Number(saleCreated.subtotal).toFixed(2)}</td></tr>
-      ${saleCreated.discountAmount > 0 ? `<tr><td>Discount</td><td></td><td style="text-align:right">-\u20B9${Number(saleCreated.discountAmount).toFixed(2)}</td></tr>` : ''}
-      <tr><td>GST</td><td></td><td style="text-align:right">\u20B9${Number(saleCreated.taxAmount).toFixed(2)}</td></tr>
-    </table>
-    <table class="totals grand"><tr><td>Total</td><td></td><td style="text-align:right">\u20B9${Number(saleCreated.totalAmount).toFixed(2)}</td></tr></table>
-    <table class="totals"><tr><td>Paid (${saleCreated.paymentMode})</td><td></td><td style="text-align:right">\u20B9${Number(saleCreated.amountPaid).toFixed(2)}</td></tr>${change}${balance}</table>
-    <p class="footer">Thank you! Get well soon.</p>
-    </body></html>`)
-    win.document.close()
-    win.focus()
-    setTimeout(() => { win.print(); setTimeout(() => win.close(), 500) }, 300)
+    if (!printReceipt({ sale: saleCreated, tenant: tenantProfile, settings })) {
+      toast.error('Allow pop-ups to print this receipt')
+    }
   }
 
   const handleCheckout = () => {
@@ -718,11 +674,9 @@ export default function PosPage() {
                     <span className="font-medium">{cleanDisplayText(item.medicineName)} - {item.quantity}</span>
                     <span>{formatCurrency(item.totalAmount)}</span>
                   </div>
-                  {(item.batchNumber || item.expiryDate) && (
+                  {item.expiryDate && (
                     <p className="text-xs text-gray-400 font-mono mt-0.5">
-                      {item.batchNumber && `Batch: ${item.batchNumber}`}
-                          {item.batchNumber && item.expiryDate && <span className="mx-1">-</span>}
-                      {item.expiryDate && `Exp: ${item.expiryDate}`}
+                      Exp: {item.expiryDate}
                     </p>
                   )}
                 </div>

@@ -8,7 +8,7 @@ import { Button, Badge } from '@/components/shared/PageHeader'
 import { PageLoader, LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import type { TenantSettings, Rack, ApiResponse } from '@/types'
 import toast from 'react-hot-toast'
-import { Settings, Users, FileText, Printer, Globe, Plus, Trash2, Lock, Eye, EyeOff, UserCheck, UserX, ShoppingCart, Package } from 'lucide-react'
+import { Settings, Users, FileText, Printer, Globe, Plus, Trash2, Lock, Eye, EyeOff, UserCheck, UserX, ShoppingCart, Package, Mail, Send } from 'lucide-react'
 
 function fetchSettings(tenantId: string) {
   return apiClient.get<ApiResponse<TenantSettings>>(`${tenantPath(tenantId)}/settings`).then(r => r.data.data)
@@ -30,7 +30,7 @@ const resetPasswordApi = (id: string, newPassword: string) => apiClient.put<ApiR
 export default function SettingsPage() {
   const tenantId = useAuthStore((s) => s.tenantId())!
   const qc = useQueryClient()
-  const [tab, setTab] = useState<'invoice' | 'gst' | 'printer' | 'pos' | 'racks' | 'users'>('invoice')
+  const [tab, setTab] = useState<'invoice' | 'gst' | 'printer' | 'pos' | 'email' | 'racks' | 'users'>('invoice')
   const [form, setForm] = useState<Partial<TenantSettings>>({})
 
   // Users tab state
@@ -60,6 +60,18 @@ export default function SettingsPage() {
       toast.success('Settings saved!')
     },
     onError: (err: any) => toast.error(err?.response?.data?.message || 'Failed to save'),
+  })
+
+  const testEmailMutation = useMutation({
+    mutationFn: async () => {
+      await saveSettings(tenantId, form)
+      return apiClient.post<ApiResponse<void>>(`${tenantPath(tenantId)}/settings/daily-sales-email/test`)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['settings', tenantId] })
+      toast.success('Daily sales summary email queued')
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.message || 'Failed to send test email'),
   })
 
   const usersQuery = useQuery({
@@ -148,6 +160,7 @@ export default function SettingsPage() {
           { key: 'gst', label: 'GST / Tax', icon: Globe },
           { key: 'printer', label: 'Printer', icon: Printer },
           { key: 'pos', label: 'POS', icon: ShoppingCart },
+          { key: 'email', label: 'Daily Email', icon: Mail },
           { key: 'racks', label: 'Storage Racks', icon: Package },
           { key: 'users', label: 'Users', icon: Users },
         ] as const).map(({ key, label, icon: Icon }) => (
@@ -292,6 +305,70 @@ export default function SettingsPage() {
                 </div>
               </div>
 
+            </div>
+          </div>
+        )}
+
+        {tab === 'email' && (
+          <div className="space-y-4">
+            <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+              <Mail className="w-4 h-4" /> Daily Sales Email
+            </h3>
+            <div className="border border-gray-100 rounded-lg p-4 space-y-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.dailySalesEmailEnabled ?? false}
+                  onChange={(e) => set('dailySalesEmailEnabled', e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-pharma-600"
+                />
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Send daily sales and profit summary</span>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Includes revenue, profit, margin, collections, credit, discounts, top medicines, and yesterday comparison.
+                  </p>
+                </div>
+              </label>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Recipient emails</label>
+                <textarea
+                  value={form.dailySalesEmailRecipients || ''}
+                  onChange={(e) => set('dailySalesEmailRecipients', e.target.value)}
+                  className={`${ic} resize-none`}
+                  rows={3}
+                  placeholder="owner@example.com, manager@example.com"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Separate multiple addresses with commas. The pharmacy profile email is used when this is blank.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Send time (IST)</label>
+                <input
+                  type="time"
+                  value={(form.dailySalesEmailTime || '20:00').slice(0, 5)}
+                  onChange={(e) => set('dailySalesEmailTime', e.target.value)}
+                  className={ic}
+                />
+              </div>
+
+              {form.dailySalesEmailLastSentDate && (
+                <p className="text-xs text-gray-500">
+                  Last scheduled summary: <strong>{form.dailySalesEmailLastSentDate}</strong>
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => testEmailMutation.mutate()}
+                disabled={testEmailMutation.isPending}
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" />
+                {testEmailMutation.isPending ? 'Sending...' : 'Save and send test'}
+              </button>
             </div>
           </div>
         )}
