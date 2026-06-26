@@ -20,6 +20,20 @@ export interface CreateTenantPayload {
   fontFamily?: string
 }
 
+export type UpdateTenantPayload = {
+  name: string
+  subdomain: string
+  email: string
+  phone?: string
+  address?: string
+  city?: string
+  state?: string
+  pincode?: string
+  gstNumber?: string
+  drugLicenseNumber?: string
+  logoUrl?: string
+}
+
 export interface FeatureFlags {
   purchaseModuleEnabled: boolean
   billingModuleEnabled: boolean
@@ -44,6 +58,9 @@ export const adminApi = {
 
   createTenant: (data: CreateTenantPayload) =>
     apiClient.post<ApiResponse<Tenant>>(`${ADMIN}/tenants`, data).then(r => r.data.data),
+
+  updateTenant: (id: string, data: UpdateTenantPayload) =>
+    apiClient.patch<ApiResponse<Tenant>>(`${ADMIN}/tenants/${id}`, data).then(r => r.data.data),
 
   toggleActive: (id: string, active: boolean) =>
     apiClient.patch<ApiResponse<Tenant>>(`${ADMIN}/tenants/${id}/toggle-active`, { active })

@@ -57,6 +57,7 @@ export interface Tenant {
   gstNumber?: string
   drugLicenseNumber?: string
   pincode?: string
+  logoUrl?: string
   purchaseModuleEnabled: boolean
   billingModuleEnabled: boolean
   reportsModuleEnabled: boolean

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { adminApi, type CreateTenantPayload } from '@/api/admin'
+import { adminApi, type CreateTenantPayload, type UpdateTenantPayload } from '@/api/admin'
 import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/store/useAuthStore'
 import { StatCard } from '@/components/shared/StatCard'
@@ -182,6 +182,19 @@ function ManageTenantDrawer({ tenant, subscription, onClose }:
     billingModuleEnabled: tenant.billingModuleEnabled,
     reportsModuleEnabled: tenant.reportsModuleEnabled,
   })
+  const [details, setDetails] = useState<UpdateTenantPayload>({
+    name: tenant.name,
+    subdomain: tenant.subdomain,
+    email: tenant.email,
+    phone: tenant.phone ?? '',
+    address: tenant.address ?? '',
+    city: tenant.city ?? '',
+    state: tenant.state ?? '',
+    pincode: tenant.pincode ?? '',
+    gstNumber: tenant.gstNumber ?? '',
+    drugLicenseNumber: tenant.drugLicenseNumber ?? '',
+    logoUrl: tenant.logoUrl ?? '',
+  })
   const [maxDisc, setMaxDisc] = useState(String(tenant.maxStaffDiscountPercent ?? 0))
   const [brand, setBrand] = useState({
     appTitle: tenant.appTitle ?? '',
@@ -201,6 +214,10 @@ function ManageTenantDrawer({ tenant, subscription, onClose }:
   const toggleActive = useMutation({
     mutationFn: () => adminApi.toggleActive(tenant.id, !tenant.isActive),
     onSuccess: () => { toast.success('Status updated'); refresh(); onClose() }, onError: onErr,
+  })
+  const saveDetails = useMutation({
+    mutationFn: () => adminApi.updateTenant(tenant.id, { ...details, subdomain: details.subdomain.toLowerCase() }),
+    onSuccess: () => { toast.success('Tenant details updated'); refresh() }, onError: onErr,
   })
   const saveFlags = useMutation({
     mutationFn: () => adminApi.updateFlags(tenant.id, flags),
@@ -244,6 +261,9 @@ function ManageTenantDrawer({ tenant, subscription, onClose }:
     </div>
   )
   const input = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-scalio-600'
+  const detailRequired = !details.name.trim() || !details.subdomain.trim() || !details.email.trim()
+  const setDetail = (key: keyof UpdateTenantPayload) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setDetails(current => ({ ...current, [key]: e.target.value }))
   const onboardingForm = { ...(settings ?? {}), ...onboarding } as Partial<TenantSettings>
   const setOnboardingField = (key: keyof TenantSettings, value: any) =>
     setOnboarding(current => ({ ...current, [key]: value }))
@@ -267,6 +287,28 @@ function ManageTenantDrawer({ tenant, subscription, onClose }:
               <Button size="sm" variant={tenant.isActive ? 'danger' : 'primary'}
                 onClick={() => toggleActive.mutate()} disabled={toggleActive.isPending}>
                 {tenant.isActive ? 'Disable' : 'Enable'}
+              </Button>
+            </div>
+          </Section>
+
+          {/* Pharmacy details */}
+          <Section title="Pharmacy details">
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <input placeholder="Pharmacy name *" value={details.name} onChange={setDetail('name')} className={input} />
+                <input placeholder="Subdomain *" value={details.subdomain} onChange={setDetail('subdomain')} className={input} />
+                <input placeholder="Email *" value={details.email} onChange={setDetail('email')} className={input} />
+                <input placeholder="Phone" value={details.phone} onChange={setDetail('phone')} className={input} />
+                <input placeholder="City" value={details.city} onChange={setDetail('city')} className={input} />
+                <input placeholder="State" value={details.state} onChange={setDetail('state')} className={input} />
+                <input placeholder="Pincode" value={details.pincode} onChange={setDetail('pincode')} className={input} />
+                <input placeholder="GST number" value={details.gstNumber} onChange={setDetail('gstNumber')} className={input} />
+                <input placeholder="Drug license" value={details.drugLicenseNumber} onChange={setDetail('drugLicenseNumber')} className={input} />
+                <input placeholder="Logo URL" value={details.logoUrl} onChange={setDetail('logoUrl')} className={input} />
+              </div>
+              <input placeholder="Address" value={details.address} onChange={setDetail('address')} className={input} />
+              <Button size="sm" onClick={() => saveDetails.mutate()} disabled={detailRequired || saveDetails.isPending}>
+                Save details
               </Button>
             </div>
           </Section>
