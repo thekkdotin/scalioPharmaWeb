@@ -288,6 +288,7 @@ export interface DashboardData {
   recentSales: RecentSale[]
   lowStockItems: LowStockItem[]
   nearExpiryItems: NearExpiryItem[]
+  expiredStockItems: NearExpiryItem[]
 }
 
 // ── Reports ───────────────────────────────────────────────────

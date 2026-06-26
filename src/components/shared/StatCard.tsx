@@ -8,6 +8,7 @@ interface StatCardProps {
   color?: 'blue' | 'green' | 'amber' | 'red' | 'purple'
   subtitle?: string
   trend?: number
+  onClick?: () => void
 }
 
 const colorMap = {
@@ -18,10 +19,19 @@ const colorMap = {
   purple: { bg: 'bg-purple-50', icon: 'bg-purple-500', text: 'text-purple-600'},
 }
 
-export function StatCard({ title, value, icon: Icon, color = 'blue', subtitle, trend }: StatCardProps) {
+export function StatCard({ title, value, icon: Icon, color = 'blue', subtitle, trend, onClick }: StatCardProps) {
   const c = colorMap[color]
+  const Component = onClick ? 'button' : 'div'
   return (
-    <div className={cn('rounded-xl p-4 md:p-5 shadow-sm border border-gray-100', c.bg)}>
+    <Component
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={cn(
+        'w-full rounded-xl p-4 text-left shadow-sm border border-gray-100 md:p-5',
+        onClick && 'transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-pharma-500 focus:ring-offset-2',
+        c.bg
+      )}
+    >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-500 truncate">{title}</p>
@@ -37,6 +47,6 @@ export function StatCard({ title, value, icon: Icon, color = 'blue', subtitle, t
           <Icon className="w-5 h-5 text-white" />
         </div>
       </div>
-    </div>
+    </Component>
   )
 }

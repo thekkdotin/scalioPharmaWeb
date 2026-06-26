@@ -50,6 +50,16 @@ export const medicinesApi = {
     apiClient.put<ApiResponse<unknown>>(`${tenantPath(tenantId)}/medicines/${medicineId}/batches/${batchId}`, data)
       .then(r => r.data.data),
 
+  resolveExpiredStock: (
+    tenantId: string,
+    medicineId: string,
+    batchId: string,
+    action: 'RETURN_TO_SELLER' | 'DISPOSE',
+    notes?: string
+  ) =>
+    apiClient.post<ApiResponse<unknown>>(`${tenantPath(tenantId)}/medicines/${medicineId}/batches/${batchId}/expired-stock-action`, { action, notes })
+      .then(r => r.data.data),
+
   findByName: (tenantId: string, name: string) =>
     apiClient.get<ApiResponse<Medicine | null>>(`${tenantPath(tenantId)}/medicines/by-name`, { params: { name } })
       .then(r => r.data.data),
