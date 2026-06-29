@@ -36,16 +36,6 @@ function formatStockQuantity(quantity: number, tabletsPerStrip?: number, showBot
   return formatStripStock(quantity, tabletsPerStrip, showBoth, context)
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-  if (!error) return fallback
-  if (error instanceof Error && error.message) return error.message
-  if (typeof error === 'object' && error !== null && 'response' in error) {
-    const response = (error as { response?: { data?: { message?: string; error?: string } } }).response
-    return response?.data?.message || response?.data?.error || fallback
-  }
-  return fallback
-}
-
 export default function ReportsPage() {
   const tenantId = useAuthStore((s) => s.tenantId())!
   const queryClient = useQueryClient()
@@ -101,7 +91,7 @@ export default function ReportsPage() {
     enabled: tab === 'inventory',
   })
 
-  const { data: investment, isLoading: ial, error: investmentError } = useQuery({
+  const { data: investment, isLoading: ial } = useQuery({
     queryKey: ['report-inventory-analytics', tenantId],
     queryFn: () => reportsApi.inventoryAnalytics(tenantId),
     enabled: tab === 'investment',
@@ -497,28 +487,7 @@ export default function ReportsPage() {
       {/* Investment Analytics */}
       {tab === 'investment' && (
         <div className="space-y-5">
-          {ial ? <PageLoader /> : investmentError ? (
-            <div className="bg-white rounded-xl border border-red-100 shadow-sm p-6">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5" />
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="font-semibold text-gray-800">Investment analytics unavailable</h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {getErrorMessage(investmentError, 'Unable to load investment analytics right now.')}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => queryClient.invalidateQueries({ queryKey: ['report-inventory-analytics', tenantId] })}
-                    className="px-3 py-2 text-sm font-medium text-white bg-pharma-600 rounded-lg hover:bg-pharma-700"
-                  >
-                    Retry
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : investment ? (
+          {ial ? <PageLoader /> : investment && (
             <>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard title="Total Invested" value={formatCurrency(investment.totalInvestedAmount)} icon={IndianRupee} color="blue" subtitle="Stock purchased till now" />
@@ -527,22 +496,24 @@ export default function ReportsPage() {
                 <StatCard title="Total Sales" value={formatCurrency(investment.totalSalesAmount)} icon={ShoppingCart} color="purple" subtitle="Revenue till now" />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard title="Gross Profit" value={formatCurrency(investment.grossProfitTillNow)} icon={TrendingUp} color="green" subtitle="From recorded sales" />
+                <StatCard title="Profit In Stock" value={formatCurrency(investment.expectedProfitInStock)} icon={Wallet} color="purple" subtitle="Expected if current stock sells" />
                 <StatCard title="Risky Stock" value={formatCurrency(investment.riskyStockValue)} icon={AlertTriangle} color="red" subtitle={`Expired / ${investment.nearExpiryDays}d expiry`} />
+                <StatCard title="Reorder Amount" value={formatCurrency(investment.suggestedReorderAmount)} icon={CreditCard} color="amber" subtitle="Estimated minimum refill" />
               </div>
 
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <BarChart2 className="w-5 h-5 text-pharma-600" />
-                  <h3 className="font-semibold text-gray-800">Business Summary</h3>
+                  <h3 className="font-semibold text-gray-800">Owner Summary</h3>
                 </div>
                 <p className="text-sm leading-6 text-gray-600">
-                  The pharmacy has purchased stock worth <span className="font-semibold text-gray-900">{formatCurrency(investment.totalInvestedAmount)}</span> so far.
-                  Stock currently available in the shop is worth <span className="font-semibold text-green-700">{formatCurrency(investment.currentStockAmount)}</span> at purchase cost.
-                  Stock worth <span className="font-semibold text-amber-700">{formatCurrency(investment.stockMovedAtCost)}</span> has moved out of live inventory.
-                  Total recorded sales are <span className="font-semibold text-purple-700">{formatCurrency(investment.totalSalesAmount)}</span>,
-                  and recorded gross profit is <span className="font-semibold text-green-700">{formatCurrency(investment.grossProfitTillNow)}</span>.
+                  Till now, stock worth <span className="font-semibold text-gray-900">{formatCurrency(investment.totalInvestedAmount)}</span> has been purchased.
+                  Current live stock in the system is <span className="font-semibold text-green-700">{formatCurrency(investment.currentStockAmount)}</span>.
+                  Around <span className="font-semibold text-amber-700">{formatCurrency(investment.stockMovedAtCost)}</span> of invested stock value is no longer in live stock.
+                  Recorded sales till now are <span className="font-semibold text-purple-700">{formatCurrency(investment.totalSalesAmount)}</span>,
+                  with gross profit of <span className="font-semibold text-green-700">{formatCurrency(investment.grossProfitTillNow)}</span>.
                 </p>
               </div>
 
@@ -563,8 +534,10 @@ export default function ReportsPage() {
                     <tbody className="divide-y divide-gray-50">
                       {[
                         ['Current Stock Selling Value', investment.currentStockSellingValue, 'Expected revenue if live stock sells at configured selling prices'],
+                        ['Expected Profit In Stock', investment.expectedProfitInStock, 'Potential margin still sitting in live inventory'],
                         ['Billed Sold Stock Cost', investment.soldStockCost, 'Purchase-cost value of stock already sold through recorded sales and historical rows'],
                         ['Risky Stock Value', investment.riskyStockValue, 'Purchase-cost value of expired and near-expiry remaining stock'],
+                        ['Suggested Reorder Amount', investment.suggestedReorderAmount, 'Estimated spend to bring low-stock medicines back to minimum alert level'],
                       ].map(([label, amount, meaning]) => (
                         <tr key={String(label)} className="hover:bg-gray-50">
                           <td className="px-4 py-3 font-medium text-gray-800">{label}</td>
@@ -577,15 +550,11 @@ export default function ReportsPage() {
                 </div>
               </div>
             </>
-          ) : (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 text-sm text-gray-500">
-              No investment analytics found yet.
-            </div>
           )}
         </div>
       )}
 
-      {/* â”€â”€ INVENTORY â”€â”€ */}
+      {/* INVENTORY  */}
       {tab === 'inventory' && (
         <div>
           {invl ? <PageLoader /> : (
