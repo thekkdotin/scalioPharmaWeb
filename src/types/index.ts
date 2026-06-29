@@ -24,6 +24,8 @@ export interface UserInfo {
   tenantName: string
   tenantSubdomain: string
   purchaseModuleEnabled: boolean
+  billingModuleEnabled?: boolean
+  reportsModuleEnabled?: boolean
   maxStaffDiscountPercent: number
   subscriptionStatus?: 'ACTIVE' | 'GRACE' | 'EXPIRED' | 'NONE'
   subscriptionStartDate?: string
@@ -279,6 +281,7 @@ export interface DashboardData {
   todaySalesCount: number
   todayProfit: number
   monthSalesAmount: number
+  currentStockInvestment: number
   totalMedicines: number
   lowStockCount: number
   nearExpiryCount: number
@@ -452,6 +455,20 @@ export interface MedicineInventoryItem {
   }[]
 }
 
+export interface InventoryAnalytics {
+  totalInvestedAmount: number
+  currentStockAmount: number
+  stockMovedAtCost: number
+  soldStockCost: number
+  totalSalesAmount: number
+  grossProfitTillNow: number
+  currentStockSellingValue: number
+  expectedProfitInStock: number
+  riskyStockValue: number
+  suggestedReorderAmount: number
+  nearExpiryDays: number
+}
+
 // ── Rack Management ───────────────────────────────────────────
 export interface Rack {
   id?: string
@@ -467,6 +484,9 @@ export interface Rack {
 export interface TenantSettings {
   id?: string
   tenantId?: string
+  purchaseModuleEnabled?: boolean
+  billingModuleEnabled?: boolean
+  reportsModuleEnabled?: boolean
   invoicePrefix: string
   invoiceFooterText?: string
   thermalPrinterEnabled: boolean

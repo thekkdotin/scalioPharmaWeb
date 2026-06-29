@@ -1,5 +1,5 @@
 import { apiClient, tenantPath } from './client'
-import type { ApiResponse, SalesReport, BestSellingMedicine, MedicineInventoryItem, DailyRow, OutstandingDuesReport, HistoricalDailySale } from '@/types'
+import type { ApiResponse, SalesReport, BestSellingMedicine, MedicineInventoryItem, DailyRow, OutstandingDuesReport, HistoricalDailySale, InventoryAnalytics } from '@/types'
 
 export const reportsApi = {
   daily: (tenantId: string, date?: string) =>
@@ -17,6 +17,10 @@ export const reportsApi = {
 
   inventory: (tenantId: string) =>
     apiClient.get<ApiResponse<MedicineInventoryItem[]>>(`${tenantPath(tenantId)}/reports/inventory`)
+      .then(r => r.data.data),
+
+  inventoryAnalytics: (tenantId: string) =>
+    apiClient.get<ApiResponse<InventoryAnalytics>>(`${tenantPath(tenantId)}/reports/inventory-analytics`)
       .then(r => r.data.data),
 
   range: (tenantId: string, from: string, to: string) =>

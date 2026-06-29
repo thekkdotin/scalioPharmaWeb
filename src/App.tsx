@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/useAuthStore'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useTenantBranding } from '@/hooks/useTenantBranding'
 import MainLayout from '@/components/layout/MainLayout'
 import HomePage from '@/pages/HomePage'
@@ -37,8 +38,14 @@ function SystemRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function ModuleRoute({ allowed, children }: { allowed: boolean; children: React.ReactNode }) {
+  if (!allowed) return <Navigate to="/dashboard" replace />
+  return <>{children}</>
+}
+
 export default function App() {
   useTenantBranding()
+  const perms = usePermissions()
 
   return (
     <BrowserRouter>
@@ -66,12 +73,12 @@ export default function App() {
           <Route path="medicines/new"         element={<MedicineFormPage />} />
           <Route path="medicines/:id/edit"    element={<MedicineFormPage />} />
           <Route path="locator"      element={<MedicineFinderPage />} />
-          <Route path="pos"          element={<PosPage />} />
+          <Route path="pos"          element={<ModuleRoute allowed={perms.canBill}><PosPage /></ModuleRoute>} />
           <Route path="sales"        element={<SalesPage />} />
-          <Route path="purchases"    element={<PurchasesPage />} />
-          <Route path="orders"       element={<OrdersPage />} />
-          <Route path="suppliers"    element={<SuppliersPage />} />
-          <Route path="reports"      element={<ReportsPage />} />
+          <Route path="purchases"    element={<ModuleRoute allowed={perms.canManagePurchases}><PurchasesPage /></ModuleRoute>} />
+          <Route path="orders"       element={<ModuleRoute allowed={perms.canManagePurchases}><OrdersPage /></ModuleRoute>} />
+          <Route path="suppliers"    element={<ModuleRoute allowed={perms.canManagePurchases}><SuppliersPage /></ModuleRoute>} />
+          <Route path="reports"      element={<ModuleRoute allowed={perms.canViewReports}><ReportsPage /></ModuleRoute>} />
           <Route path="settings"     element={<SettingsPage />} />
         </Route>
 

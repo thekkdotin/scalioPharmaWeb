@@ -316,7 +316,7 @@ function ManageTenantDrawer({ tenant, subscription, onClose }:
           {/* Feature flags */}
           <Section title="Modules">
             <div className="space-y-2">
-              {([['purchaseModuleEnabled', 'Purchase'], ['billingModuleEnabled', 'Billing'], ['reportsModuleEnabled', 'Reports']] as const).map(([key, label]) => (
+              {([['purchaseModuleEnabled', 'Purchase'], ['billingModuleEnabled', 'Billing'], ['reportsModuleEnabled', 'Reports & Investment Analytics']] as const).map(([key, label]) => (
                 <label key={key} className="flex items-center gap-2 text-sm text-gray-700">
                   <input type="checkbox" checked={flags[key]}
                     onChange={(e) => setFlags(f => ({ ...f, [key]: e.target.checked }))}

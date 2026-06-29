@@ -56,10 +56,11 @@ export default function DashboardPage() {
         <StatCard title="Today's Revenue"     value={formatCurrency(d.todaySalesAmount)}  icon={IndianRupee}   color="green"  />
         <StatCard title="Today's Sales"       value={d.todaySalesCount}                   icon={ShoppingCart}  color="blue"   />
         <StatCard title="Month Revenue"       value={formatCurrency(d.monthSalesAmount)}  icon={TrendingUp}    color="purple" />
-        <StatCard title="Total Medicines"     value={d.totalMedicines}                  icon={Package}       color="blue"   />
+        <StatCard title="Invested Amount"    value={formatCurrency(d.currentStockInvestment ?? 0)} icon={Package} color="amber" subtitle="Current live stock" />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <StatCard title="Total Medicines"     value={d.totalMedicines} icon={Package} color="blue" />
         <StatCard title="Low Stock Alerts"    value={d.lowStockCount}   icon={AlertTriangle} color="amber" subtitle="Need reorder" />
         <StatCard
           title="Near Expiry (90d)"
